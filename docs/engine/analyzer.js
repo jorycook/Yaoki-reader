@@ -142,10 +142,116 @@ function shortGloss(g) {
    Aozora Bunko: the kanji form of the word meant, or '=' and the spelling to look up instead (old spellings).
    A key may end in ':' and a class letter (v verb, n noun, d adverb, a adjective, x other) to apply only then.
    Made from reviewing the reader's choices in thirty works (see check/README or the commit that added them). */
-var KANA = {};
+var KANA = {
+  'あたり': '辺り', 'あり': '在り', 'いつか': '何時か', 'いま': '今', 'うち': '内', 'うつ': '打つ', 'おお': '-', 'かえる:v': '返る', 'かも': '-',
+  'がた': '方', 'きのう': '昨日', 'きょう': '今日', 'さ': '然', 'さし': '差し', 'さす': '差す', 'さる': '然る', 'して': '-', 'じき': '直', 'そば': '側',
+  'たい': '-', 'たつ:v': '経つ', 'たま': '偶', 'たより': '頼り', 'だれ': '誰', 'つく': '付く', 'てる': '-', 'とり': '鳥', 'とる': '取る',
+  'ないか': '-', 'なぞ': '-', 'なん': '何', 'はねる': '跳ねる', 'ひく': '引く', 'ひる': '昼', 'まわり': '周り', 'むら': '群', 'もと': '元',
+  'もの': '物', 'もん': '物', 'やさしい': '優しい', 'やむ': '止む', 'ゆする': '揺する', 'わく:v': '湧く', 'わし': '儂', 'わん': '-'
+};
 /* Words written in kana whose dictionary gloss starts with a sense they rarely have in a story: the gloss to show
    instead. Keys as in KANA; a key may also end in ':' and the kanji form of the word chosen. */
-var GLOSS = {};
+var GLOSS = {
+  'あがる': 'to go up; to rise; to enter; (polite) to eat', 'あげく': 'after (much ...); in the end; finally',
+  'あたり': 'surroundings; vicinity; around (a place)', 'あたりまえ': 'ordinary; natural; of course',
+  'あたる': 'to hit; to correspond to; to touch', 'あちこち': 'here and there; all around',
+  'あてる': 'to put on/against; to hit; to guess', 'あと': 'after; later; the rest; more (remaining)',
+  'あまり:d': '(not) very; (not) much; too (much)', 'あり': 'to be; to exist; to have',
+  'あんまり': 'too (much); so; (with neg.) not very', 'いい': 'good; fine; OK; enough', 'いえる': 'can say; (interj. いえ) no',
+  'いける': '(neg.) no good; must not; to be OK', 'いた': '(past of いる) was; was ~ing; board',
+  'いちめん': 'all over; the whole surface; one aspect', 'いったい': '(what) on earth; in the world; generally',
+  'いっぱい': 'full (of); a lot; fully; a cupful', 'いつか': 'someday; once (before); before one knew it',
+  'いる': '(-te) be ...-ing, have ...-ed; be (animate)', 'う': '(old spelling: さう=そう, -まう=-もう, -らう=-ろう)',
+  'うすい': 'thin; faint; pale, light (color); dim', 'うち': 'inside; within; while; among; home (家)',
+  'うまい': 'good; skillful; delicious; well (うまく)', 'うんうん': 'with a groan; straining hard; uh-huh',
+  'えらい': 'great; awful, terrible; tremendous; tough', 'おい': 'hey!; oi!',
+  'おかげ': 'thanks to; because of; (someone\'s) help', 'おかしい': 'strange, odd; funny, amusing',
+  'おく': 'to put; to leave; (~ておく) do in advance', 'おくる': '(おくれ) please (do) for me; give me; to send',
+  'おさん': 'O-San (name); kitchen maid; childbirth', 'おのれ': 'oneself; you! (abusive); I, me',
+  'おばはん': 'middle-aged woman; missus; aunt', 'おまけ': 'on top of that (おまけに); freebie',
+  'おもて': 'outside; front; surface', 'かい': 'question particle (…?); worth, effect',
+  'かいて': 'te-form of かく (write; draw; scratch; etc.)', 'かえ': '(sentence-end question particle; = かい)',
+  'かえる:v': 'to return; to change; (-かえる) completely', 'かかる': 'to hang; to set about; to take (time); such',
+  'かかわる': 'to concern; to be involved in; to affect', 'かく:d': 'thus; in this way; like this',
+  'かくして': 'hiding (隠して); thus; in this way', 'かける': 'to hang; to put on; to apply; to sit down',
+  'かっこう': 'cuckoo (郭公); appearance, shape (格好)', 'かなう': 'to come true; to be possible; to match',
+  'かよう': 'in this way (斯様); to commute (通う)', 'かる': '(classical adj. ending: なかりし = なかった); to mow',
+  'かれこれ': 'about, nearly; this and that', 'がた': 'about; around, near; (polite plural)',
+  'がらん': 'empty; deserted; clanging', 'きく': 'to hear; to ask; to listen', 'きれい': 'pretty; clean; neat; completely',
+  'くせ': '(～くせに) even though; habit; quirk', 'くら': '(くらゐ = くらい) about; storehouse',
+  'くれる': 'to give (me); (~てくれる) to do for me', 'けむる': 'to be hazy; to look dim; to smoke',
+  'ける': '(classical past aux. けり/けむ); to kick', 'こちら': 'here; this way; this side (we, us)',
+  'こっち': 'this way; here; this side (me, us)', 'こつ': 'thing, matter (= こと); knack',
+  'こつこつ': 'tapping; knocking; steadily', 'こめる': 'to put into (effort, feeling); to load',
+  'ごちゃごちゃ': 'in a jumble; messy; cluttered; crowded', 'ごろごろ': 'lying about; idling; rolling; rumbling',
+  'ごん': 'Gon (a name, e.g. the fox in ごん狐)', 'さ': 'so, like that (さう=そう); swiftly (さつと)',
+  'さう': 'so; like that (old spelling of そう)', 'さき': 'tip; ahead; first; previous; beyond',
+  'さげる': 'to hang; to carry (in hand); to lower', 'さし': '(from さす) insert; hold up; shine; point',
+  'さす': 'to shine; to be tinged; to hold up (umbrella)', 'さすが': 'as expected; after all; still; even',
+  'さっぱり': '(not) at all; completely; refreshed; neat', 'さては': 'so that\'s it; so then; and also',
+  'さま': 'appearance; state; honorific (Mr./Ms.)', 'さる': 'a certain; (されば) therefore; (さらぬ) not so',
+  'ざわざわ': 'rustling; noisily; with a stir', 'しかる': 'to scold; (しかるべき) proper, due',
+  'した': 'did (past of する); below; under', 'しつ': 'to do (form of する)', 'して': 'doing (te-form of する); and; as',
+  'しめる': 'to shut; to tie, fasten; (しめた!) got it!', 'しょう': '(でしょう) probably; I suppose; right?',
+  'しん': '(しんと) hushed, still; heart; core', 'じゃ': 'then; well; is (= だ, では)',
+  'すかす': 'to look through; to coax; to get hungry', 'すぎる': 'to pass; be too ~; (にすぎない) only, merely',
+  'すむ': 'to finish; to be settled; (すまない) sorry', 'ずっと': 'much (more); far; all along; all the way',
+  'せい': 'because of; due to; (someone\'s) fault', 'せつ': 'make/let ~ do (causative -せる)',
+  'そいつ': 'that one; that thing; that guy', 'そうそう': 'oh yes!; that\'s right; so much',
+  'そうだ': 'I hear that; it seems; that is so', 'そっくり': 'entirely; all; exactly like',
+  'そつ': 'softly, quietly (そつと = そっと); slip-up', 'そら': 'sky (空); look!, there!; that\'s (それは)',
+  'そろえる': 'to line up; to arrange; to match; to gather', 'そん': 'that (= それ); そんなら: if so, then',
+  'そんなもの': 'such a thing; that sort of thing', 'たが': '(past た + が) did ..., but; (rare) hoop',
+  'ただ': 'only; just; merely; but; ordinary; free', 'たまう': '(hon. aux.) deign to; (～たまえ) please do; give',
+  'たまる': 'to collect; to pile up; (neg.) unbearable', 'ため': 'for the sake of; because of; benefit',
+  'たん': 'past た + explanatory ん (…did)', 'たんだ': 'past た + んだ (explanatory: \'it\'s that...\')',
+  'だし': '(だ+し) and besides; soup stock', 'だつ': '(copula だ) is; was',
+  'ちがい': '(にちがいない) must be, surely; difference; error', 'ちょうど': 'just; exactly; just as/like (…ように)',
+  'ちらちら': 'flickering; glancing (at); fluttering down', 'ぢ': '(old kana for じ, e.g. ぢや = じゃ)',
+  'つい': 'unintentionally; just (now, near)', 'ついで': '(ついでに) while at it; in passing; occasion',
+  'つく': 'to stick; to be attached; (気が~) to notice', 'つとめて': 'making an effort to; as much as possible',
+  'つまり': 'that is (to say); in short; after all', 'てい': 'part of ～ている (is ~ing; has ~ed)',
+  'でく': 'be ~ing, keep ~ing (-でいる/-でいく)', 'でる': 'to go out; to come out; to appear',
+  'と': '(quote marker); and; with; when; if', 'とい': '(という) called, named; that; (問い) question',
+  'とおり': 'as; just as (said/thought); street', 'とかく': 'apt to; anyhow; (doing) this and that',
+  'とき': 'when; time; occasion', 'ところ': 'place; point, aspect; (just) when, moment',
+  'とって': 'taking (te-form of 取る); handle', 'とまる': 'to stop; to perch (on)',
+  'とれる': 'can take; can make out; to come off', 'どういう': 'what kind of; what; how',
+  'どうか': 'please; somehow; whether (or not)', 'どうも': 'somehow; it seems; really; very (sorry)',
+  'どんと': 'with a thud; with a bang; forcefully', 'どんどん': 'rapidly; steadily; on and on; (drumming)',
+  'ないか': 'isn\'t it?; won\'t you?; isn\'t there?', 'なう': 'to become (form of なる)',
+  'なお': 'still; all the more; further', 'なおる': 'to get well; to recover; to be fixed',
+  'なかなか': 'quite; very; (with neg.) not easily/readily', 'なくなる': 'to disappear; to run out; to be no longer',
+  'なす': 'to make (into); to form; to do', 'なぞ': 'such things as; or the like; etc.',
+  'なつ': '(old sp. なつた/なつて = なった) became; summer', 'なり': 'as soon as; …or…; (classical) is',
+  'なれる': 'can become (なる); to get used to', 'なんだ': '(explanatory) it\'s that ...; (old) did not',
+  'ぬける': 'to fall out; to come out; to slip through', 'ねえ': 'not (colloq. = ない); hey; right?',
+  'のと': '(particles の + と)', 'はう': 'side; direction (old sp. of ほう 方); to crawl',
+  'はく': 'to wear (shoes, trousers); (吐く) to spit', 'はたして': 'really; actually; sure enough',
+  'はなる': '(は + ない) is not; there is no', 'はむ': '(usually particle は + next word); to graze',
+  'ばあさん': 'old woman; granny; grandmother', 'ばん': '(一ばん) most, best; number; turn',
+  'ぱちぱち': 'crackling; clapping; blinking', 'ひとり': 'one person; alone; by oneself',
+  'ひどい': 'terrible; severe; very (ひどく); cruel', 'ひる': 'daytime; noon; lunch',
+  'ぴたり': '(stop) suddenly; exactly; tightly', 'ふう': 'way; manner; appearance; air',
+  'ふと': 'suddenly; unexpectedly; by chance', 'ふる': 'to shake; to wave; (降る) to fall (rain, snow)',
+  'ぶらぶら': 'strolling, aimlessly; idly; dangling', 'ほんとう': 'true; real; truth; really (ほんとうに)',
+  'ぼうっと': 'dimly; hazily; in a daze', 'ぼんやり': 'vacantly; absentmindedly; idly; dimly',
+  'まあ': 'oh my!; well; now, just; more or less', 'まえる': 'front; before; ago (前); catch (つらまえる)',
+  'ましょう': 'probably; let\'s; I\'ll (polite)', 'また': 'again; also; moreover; and',
+  'まるで': 'just like; as if; completely; (not) at all', 'まわす': 'to turn; to spin; (after verb) ... around',
+  'まわり': 'around; surroundings; circumference', 'みな': 'all; everyone; everything',
+  'みる': 'to see; to look; (after -te) to try', 'むら': 'grove; clump; cluster; (村) village',
+  'もう': 'already; (no) more; one more; soon', 'もつ': 'to have; to hold; to carry',
+  'もと': 'original (state); former(ly); origin', 'もん': 'thing (= もの); emphatic ending (~だ, ~か)',
+  'やう': '(old spelling of よう 様) like; as if; way', 'やった': 'did; gave; sent (past of やる); hooray',
+  'やつ': 'fellow; guy; thing; one', 'やる': 'to do; to give (to); to send', 'ゆうべ': 'last night; evening',
+  'よう': 'way (to do); manner; like; as if', 'ように': 'like; as if; so that; in order to',
+  'ようやく': 'finally; at last; gradually; barely', 'ようよう': 'finally; barely; gradually',
+  'よく': 'well; carefully; often', 'より': 'than; from; more', 'よる:v': 'according to; to depend on; to be due to',
+  'れつ': '(passive/potential -れる); row; line', 'ろう': '(…だろう) probably; I suppose; I wonder',
+  'ろうか': 'I wonder (in …だろうか); corridor', 'わけ': 'reason; meaning; circumstances; case',
+  'わける': 'to divide; to part (a crowd etc.); to share', 'われ': 'I; me; oneself; (dial.) you'
+};
 function kanaPref(key, cls) { return KANA[key + ':' + cls] || KANA[key]; }
 
 /* Pick the best entry for a key, given what the tokenizer says about the word. */
@@ -177,7 +283,8 @@ Dict.prototype.pick = function (key, cls, reading, inflected, weak) {
       if (ks && ks.has(e.i)) score += ks.get(e.i) * 0.3;
       /* the words a learner meets in kana most, checked against real texts (KANA above) */
       var pref = kanaPref(key, cls);
-      if (pref && pref.charAt(0) !== '=' && e.k.indexOf(pref) >= 0) score += 30;
+      /* '-': the word written without kanji */
+      if (pref && pref.charAt(0) !== '=' && (pref === '-' ? !e.k.length : e.k.indexOf(pref) >= 0)) score += 30;
       if (e.r[0] === key) score += 1;
     } else {
       if (e.k[0] === key) score += 1;
@@ -567,7 +674,12 @@ function baseForms(s) {
     var p = s.slice(0, cut), t = s.slice(cut), last = p.charAt(p.length - 1), q = p.slice(0, -1);
     if (t && !/^[ぁ-ゖ]+$/.test(t)) continue;
     out.push({ b: p + 'る', stem: cut, cls: 'v' });
-    if (GODAN[last]) out.push({ b: q + GODAN[last], stem: cut, cls: 'v' });
+    /* a godan verb's stem ends in the a, i, e or o row, each with the endings that follow it */
+    if (GODAN[last]) {
+      var row = 'かがさたなばまらわ'.indexOf(last) >= 0 ? 'a' : 'きぎしちにびみりい'.indexOf(last) >= 0 ? 'i' : 'けげせてねべめれえ'.indexOf(last) >= 0 ? 'e' : 'o';
+      var fits = row === 'i' || (row === 'a' && /^(な|れ|せ|ず|ぬ|ん|さ)/.test(t)) || (row === 'e' && (!t || /^(る|ば|た|て|な|ま|ず|ら|れ)/.test(t))) || (row === 'o' && /^う/.test(t));
+      if (fits) out.push({ b: q + GODAN[last], stem: cut, cls: 'v' });
+    }
     if (last === 'っ' && q) ['う', 'つ', 'る', 'く'].forEach(function (e) { out.push({ b: q + e, stem: cut, cls: 'v' }); });
     if (last === 'ん' && q) ['ぬ', 'ぶ', 'む'].forEach(function (e) { out.push({ b: q + e, stem: cut, cls: 'v' }); });
     if (last === 'い' && q && /^[てただで]/.test(t)) ['く', 'ぐ'].forEach(function (e) { out.push({ b: q + e, stem: cut, cls: 'v' }); });
@@ -583,6 +695,9 @@ var INFLECTION = /^(|て|で|た|だ|ちゃ|じゃ|たら|だら|たり|だり|�
 
 /* a single hiragana the tokenizer calls one of these is usually a piece of a longer word it did not see */
 var STRAY = { 名詞: 1, 感動詞: 1, フィラー: 1, 接頭詞: 1, 副詞: 1, 連体詞: 1, その他: 1 };
+function isStray(t) {
+  return t.surface_form.length === 1 && STRAY[t.pos] && !/^(非自立|接尾|代名詞|数|特殊)$/.test(t.pos_detail_1 || '');
+}
 
 /* Whether a text is written in the old spelling: enough of its marks, per thousand characters. */
 function oldSpelling(text) {
@@ -594,8 +709,13 @@ function oldSpelling(text) {
 function modernize(text) {
   return text.replace(/ゐ/g, 'い').replace(/ゑ/g, 'え').replace(/ヰ/g, 'イ').replace(/ヱ/g, 'エ')
     .replace(/([ぁ-ゖ㐀-䶿一-鿿々])つ(?=[かきくけこさしすせそたちてとぱぴぷぺぽ])/g, '$1っ')
-    .replace(/([きぎしじちぢにひびぴみり])([やゆよ])(?=[うつっくんかたてとのにはをもでがし、。」])/g, function (m, a, b) { return a + { や: 'ゃ', ゆ: 'ゅ', よ: 'ょ' }[b]; })
-    .replace(/っ(?=[たて])/g, 'っ');
+    .replace(/([きぎしじちぢにひびぴみり])([やゆよ])(?=[つっくんかきけこさすせそたてとのにはをもでがし、。」])/g, function (m, a, b) { return a + { や: 'ゃ', ゆ: 'ゅ', よ: 'ょ' }[b]; })
+    /* old long vowels, the same length in modern kana: さう そう, かう こう, やう よう, だらう だろう, しやう しょう */
+    .replace(/([きしちにひみりぎじびぴ])やう/g, function (m, a) { return a + 'ょう'; })
+    .replace(/(さ|か|や|ら|た|だ|ざ|ば|は)う(?![ぁ-ゖ]?[る])/g, function (m, a) { return { さ: 'そ', か: 'こ', や: 'よ', ら: 'ろ', た: 'と', だ: 'ど', ざ: 'ぞ', ば: 'ぼ', は: 'ほ' }[a] + 'う'; })
+    /* old kana inside common words: まへ まえ (前), うへ うえ (上), いへ いえ, かほ かお (顔), おほ おお (大), とほ とお */
+    .replace(/まへ/g, 'まえ').replace(/うへ/g, 'うえ').replace(/いへ(?=[どばがはのにをも])/g, 'いえ').replace(/かほ/g, 'かお')
+    .replace(/おほ/g, 'おお').replace(/とほ/g, 'とお').replace(/こほ/g, 'こお').replace(/ほのほ/g, 'ほのお');
 }
 
 /* ---------- tokens the tokenizer got wrong ---------- */
@@ -642,6 +762,15 @@ Engine.prototype.repair = function (toks, spans, names) {
     if (!(p in oneTok)) { var tt = self.tokenizer.tokenize(p); oneTok[p] = tt.length === 1 && tt[0].word_type !== 'UNKNOWN' ? tt[0] : null; }
     return oneTok[p];
   }
+  var seqs = {};
+  function seqOf(p) {
+    if (!(p in seqs)) {
+      var tt = self.tokenizer.tokenize(p);
+      seqs[p] = tt.length >= 2 && tt.every(function (t) { return t.word_type !== 'UNKNOWN'; }) &&
+        (tt[0].pos === '動詞' || tt[0].pos === '形容詞') && tt.slice(1).every(function (t) { return t.pos === '助動詞' || t.pos === '助詞' && /^(て|で|ば|たり|だり|ながら)$/.test(t.surface_form) || t.pos_detail_1 === '非自立' || t.pos_detail_1 === '接尾'; }) ? tt : null;
+    }
+    return seqs[p];
+  }
   function classPos(c) { return c === 'd' ? '副詞' : c === 'a' ? '形容詞' : c === 'v' ? '動詞' : '名詞'; }
   function peel(str) {
     var n = str.length, best = [{ cost: 0, parts: [] }];
@@ -650,7 +779,11 @@ Engine.prototype.repair = function (toks, spans, names) {
       for (var len = 1; len <= Math.min(10, n - i); len++) {
         var p = str.slice(i, i + len), cost = null, kind = null, base = null;
         var one = single(p);
-        if (len >= 2 && dict.has(p)) {
+        /* a verb or adjective with its endings, as the tokenizer reads it on its own (し + た, いれ + て): kept so,
+           rather than taken for a noun written the same way (した 下) */
+        var sq = len >= 2 && !one ? seqOf(p) : null;
+        if (sq) { cost = 0.55 - Math.min(len, 6) * 0.02; kind = 'seq'; }
+        if (cost === null && len >= 2 && dict.has(p)) {
           var pe = dict.entries(p)[0];
           cost = 1 - pe.rank * 0.1 - Math.min(len, 6) * 0.08; kind = 'word';
         }
@@ -670,6 +803,7 @@ Engine.prototype.repair = function (toks, spans, names) {
     var out = [];
     out.cost = best[n].cost;
     best[n].parts.forEach(function (x) {
+      if (x.kind === 'seq') { seqOf(x.p).forEach(function (t) { out.push(t); }); return; }
       if (x.one && x.kind !== 'form') { out.push(x.one); return; }
       if (x.kind === 'word') {
         var c0 = (dict.entries(x.p)[0].senses[0] || {}).c;
@@ -731,7 +865,7 @@ Engine.prototype.repair = function (toks, spans, names) {
     var sf = t.surface_form;
     if (t.word_type === 'UNKNOWN') return 3 * sf.length;
     if (t.pos === '助詞' || t.pos === '助動詞') return sf.length >= 2 ? 0.6 : 0.75;
-    if (sf.length === 1) return STRAY[t.pos] ? 3 : 0.9;
+    if (sf.length === 1) return isStray(t) ? 3 : 0.9;
     if (dict.has(sf) || dict.has(lemma(t))) { var e0 = dict.entries(dict.has(sf) ? sf : lemma(t))[0]; return 1 - e0.rank * 0.1 - Math.min(sf.length, 6) * 0.08; }
     return 1.1 - sf.length * 0.05;
   }
@@ -740,7 +874,7 @@ Engine.prototype.repair = function (toks, spans, names) {
     var r1 = r0;
     while (r1 + 1 < toks.length && /^[ぁ-ゖ]+$/.test(toks[r1 + 1].surface_form) && !toks[r1 + 1].synth) r1++;
     var run = toks.slice(r0, r1 + 1);
-    var stray = run.some(function (t) { return t.surface_form.length === 1 && STRAY[t.pos]; });
+    var stray = run.some(isStray);
     var str0 = run.map(function (t) { return t.surface_form; }).join('');
     if (stray && run.length >= 2 && str0.length >= 3 && str0.length <= 40) {
       var now0 = run.reduce(function (n, t) { return n + tokCost(t); }, 0);
@@ -919,6 +1053,12 @@ Engine.prototype.rescue = function (w, head, surface, reading) {
   function tryKey(k, c, rd, infl) { return k && k !== key ? dict.pick(k, c || cls, rd || '', infl === undefined ? true : infl) : null; }
   var hit = null, i;
   if (LAUGH.test(surface) || LAUGH.test(hira(surface))) return { en: '(laughter)', reading: '' };
+  /* in modern kana first (ちよこんと → ちょこんと) */
+  var modernSurface = modernize(surface);
+  if (modernSurface !== surface && !w.modernTried) {
+    var mh = this.rescue({ key: modernize(key), cls: cls, modernTried: true }, head, modernSurface, reading);
+    if (mh) return mh;
+  }
   /* a piece of hiragana the tokenizer could not place is a fragment of something, not a word to look up */
   if (head.word_type === 'UNKNOWN' && /^[ぁ-ゖ]+$/.test(surface)) return null;
   /* old spelling: 思ふ → 思う, ゐる → いる, 考へる → 考える, やつぱり → やっぱり */
