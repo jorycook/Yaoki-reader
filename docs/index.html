@@ -1,0 +1,1248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Yaoki Reader</title>
+<meta name="description" content="Read Japanese with the furigana hidden. Touch a phrase to see its reading and meaning.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F4F5F9">
+<meta name="apple-mobile-web-app-title" content="Yaoki Reader">
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<style>
+/* page base: what the reader assumed from the page it first ran in */
+:root { color-scheme: light; box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; padding: 0; }
+img { max-width: 100%; }
+[hidden]:not([hidden=until-found i]) { display: none !important; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&family=Noto+Serif+JP:wght@400;500;600&family=Klee+One:wght@400;600&display=swap">
+<style>
+/* Layout: a one-screen app in a single column (max 640px). Library, add form and reader are views of that column;
+   the reader text scrolls inside it and the reveal card floats just above the finger. Look: Yaoki stamp-card stationery. */
+:root {
+  --ground: #F4F5F9; --card: #FFFFFF; --ink: #1B2440; --muted: #5A6382;
+  --line: #DDE1EC; --line-strong: #C9D0E3; --outline: #1B2440; --hard: #1B2440;
+  --accent: #2F4FD0; --accent-ink: #2F4FD0; --accent-soft: #E8ECFB; --on-accent: #FFFFFF;
+  --mark: #FFE9B0; --note: #FFF4D6; --stamp: #C7361E; --scrim: rgba(27, 36, 64, 0.45);
+  --ui: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Yu Gothic', system-ui, sans-serif;
+  /* Japanese text is set in a print (明朝) face by default, the forms used in books and documents.
+     The textbook face (Klee One) draws a few kanji the handwritten way (令, 鈴), so it is a choice, not the default. */
+  --jp-print: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --jp-hand: 'Klee One', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --jp: var(--jp-print);
+  --jp-w: 500;
+  --read: 19px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #12172A; --card: #1C233B; --ink: #E8EBF6; --muted: #A6AECA;
+    --line: #2C3554; --line-strong: #3B466C; --outline: #7B86B4; --hard: #05070F;
+    --accent: #4560E0; --accent-ink: #A9B8FF; --accent-soft: #262F58; --on-accent: #FFFFFF;
+    --mark: #5E4B10; --note: #37301A; --stamp: #FF8D76; --scrim: rgba(3, 5, 12, 0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #12172A; --card: #1C233B; --ink: #E8EBF6; --muted: #A6AECA;
+  --line: #2C3554; --line-strong: #3B466C; --outline: #7B86B4; --hard: #05070F;
+  --accent: #4560E0; --accent-ink: #A9B8FF; --accent-soft: #262F58; --on-accent: #FFFFFF;
+  --mark: #5E4B10; --note: #37301A; --stamp: #FF8D76; --scrim: rgba(3, 5, 12, 0.6);
+  color-scheme: dark;
+}
+body.face-hand { --jp: var(--jp-hand); --jp-w: 600; }
+html, body { height: 100%; }
+body { background: var(--ground); color: var(--ink); font-family: var(--ui); font-size: 15px; line-height: 1.45; font-weight: 500; -webkit-text-size-adjust: 100%; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
+#app { height: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; min-width: 0; }
+.view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.bar { flex-shrink: 0; display: flex; align-items: center; gap: 8px; min-height: 56px; padding-inline: 16px; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 16px 28px; display: flex; flex-direction: column; gap: 14px; }
+.brand { flex: 1; min-width: 0; font-size: 20px; font-weight: 800; }
+.brand small, .ja-en small { font-size: 13px; font-weight: 700; color: var(--muted); }
+.bar-title { flex: 1; min-width: 0; font-family: var(--jp); font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-btn { flex-shrink: 0; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px; background: none; display: flex; align-items: center; justify-content: center; }
+.icon-btn.lead { margin-left: -10px; }
+.pill { flex-shrink: 0; height: 40px; padding: 0 14px; border-radius: 20px; background: var(--card); border: 2px solid var(--outline); font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+.btn { width: 100%; min-height: 54px; padding: 8px 16px; border-radius: 16px; border: 2px solid var(--outline); background: var(--accent); color: var(--on-accent); box-shadow: 0 4px 0 var(--hard); font-size: 17px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--hard); }
+.btn.quiet { background: var(--card); color: var(--ink); }
+.btn[disabled] { background: var(--line); color: var(--muted); border-color: var(--line-strong); box-shadow: none; cursor: default; transform: none; }
+.hint { font-size: 13px; color: var(--muted); font-weight: 700; }
+.tag { flex-shrink: 0; padding: 2px 9px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-ink); font-family: var(--ui); font-size: 11px; font-weight: 800; }
+
+/* library */
+#texts, .works { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+#texts li, .works li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.text-card { flex: 1; min-width: 0; text-align: left; padding: 12px 14px; border-radius: 18px; background: var(--card); border: 2px solid var(--outline); box-shadow: 0 3px 0 var(--hard); display: flex; flex-direction: column; gap: 3px; }
+.text-card:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--hard); }
+.tc-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.tc-title { flex: 1; min-width: 0; font-family: var(--jp); font-size: 18px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-prev { font-family: var(--jp); font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-meta { font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.confirm { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 18px; border: 2px dashed var(--stamp); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-weight: 700; }
+.confirm span { flex: 1 1 160px; min-width: 0; }
+.mini { min-height: 40px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--outline); background: var(--card); font-size: 13px; font-weight: 800; }
+.mini.danger { background: var(--stamp); border-color: var(--stamp); color: var(--ground); }
+.empty { padding: 12px 14px; border-radius: 14px; border: 2px dashed var(--line-strong); font-size: 13px; font-weight: 700; color: var(--muted); }
+.backup { display: flex; flex-wrap: wrap; gap: 8px; }
+.foot-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 20px; }
+a.linklike { display: inline-flex; align-items: center; }
+.linklike { align-self: flex-start; min-height: 44px; padding: 0; border: 0; background: none; color: var(--accent-ink); font-size: 13px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+
+/* add form */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 13px; font-weight: 800; }
+.field input, .field textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 14px; border: 2px solid var(--outline); background: var(--card); font-size: 16px; }
+.field textarea { min-height: 220px; resize: vertical; font-family: var(--jp); font-weight: var(--jp-w); line-height: 1.8; }
+.field-foot { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.field-foot .over { color: var(--stamp); }
+.progress { display: flex; flex-direction: column; gap: 8px; }
+.track { height: 12px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.track i { display: block; width: 0%; height: 100%; border-radius: 0 6px 6px 0; background: var(--accent); transition: width 0.2s; }
+.problem { padding: 10px 14px; border-radius: 14px; border: 2px solid var(--stamp); font-size: 13px; font-weight: 700; }
+
+/* reader */
+#passage { padding-top: 0.5em; font-family: var(--jp); font-size: var(--read); font-weight: var(--jp-w); line-height: 2.2; line-break: strict; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: pan-y; }
+#passage p { margin: 0 0 0.5em; }
+#passage p.gap { height: 0.6em; margin: 0; }
+.u { white-space: nowrap; }
+.ph { -webkit-appearance: none; appearance: none; display: inline-block; max-width: 100%; margin: 0; padding: 0 1px; border: 0; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; background: none; font: inherit; line-height: inherit; color: inherit; text-align: left; white-space: normal; vertical-align: baseline; -webkit-tap-highlight-color: transparent; }
+.rb { position: relative; }
+.rt { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); white-space: nowrap; font-family: var(--jp); font-weight: 400; line-height: 1; color: var(--muted); pointer-events: none; -webkit-user-select: none; user-select: none; }
+.ph .rt { font-size: 0.5em; margin-bottom: -0.2em; visibility: hidden; }
+.ph.seen { border-bottom: 2px dotted var(--accent-ink); }
+.ph.on { background: var(--mark); border-bottom: 2px solid var(--outline); }
+.ph.on .rt { visibility: visible; }
+body.no-furi .ph.on .rt, body.no-furi #lens .rt { visibility: hidden; }
+.foot { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 2px solid var(--line); }
+.foot-label { flex: 1; min-width: 0; font-size: 13px; font-weight: 800; }
+.foot-count { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.foot-count small { font-size: 12px; font-weight: 700; color: var(--muted); }
+.wait { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: var(--note); font-family: var(--ui); font-size: 13px; font-weight: 700; line-height: 1.45; }
+
+/* reveal card */
+#lens { position: fixed; z-index: 30; left: 50%; top: 0; transform: translateX(-50%); width: min(560px, calc(100% - 20px)); box-sizing: border-box; padding: 8px 14px 12px; border-radius: 18px; background: var(--card); border: 2px solid var(--outline); box-shadow: 0 4px 0 var(--hard); pointer-events: none; display: flex; flex-direction: column; gap: 8px; }
+.lw { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 14px; padding-top: 4px; }
+.lc { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
+.lj { font-family: var(--jp); font-size: 26px; font-weight: var(--jp-w); line-height: 46px; }
+.lj .rt { font-size: 11px; margin-bottom: -3px; }
+.lc.f .lj { color: var(--muted); }
+.le { min-height: 15px; max-width: 180px; font-size: 12px; font-weight: 700; line-height: 15px; text-align: center; text-wrap: balance; }
+.lg { display: flex; align-items: baseline; gap: 8px; padding: 5px 10px; border-radius: 10px; background: var(--accent-soft); line-height: 22px; }
+.lg b { flex-shrink: 0; font-size: 11px; font-weight: 800; color: var(--accent-ink); }
+.lg span { flex-shrink: 0; font-family: var(--jp); font-size: 15px; font-weight: 600; }
+.lg em { font-style: normal; font-size: 12px; font-weight: 700; line-height: 16px; }
+body.no-mean .le { display: none; }
+body.no-gram .lg { display: none; }
+
+/* sheets */
+.scrim { position: fixed; z-index: 40; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: var(--scrim); }
+.sheet { position: fixed; z-index: 41; left: 50%; bottom: 0; transform: translateX(-50%); width: min(640px, 100%); max-height: 88%; overflow-y: auto; box-sizing: border-box; padding: 18px 16px calc(22px + env(safe-area-inset-bottom, 0px)); border-radius: 26px 26px 0 0; border-top: 2px solid var(--outline); background: var(--ground); display: flex; flex-direction: column; gap: 10px; }
+.sheet h2 { margin: 0; font-size: 18px; font-weight: 800; text-wrap: balance; }
+.sheet h2 small { font-size: 13px; font-weight: 700; color: var(--muted); }
+.switch { min-height: 66px; padding: 10px 14px; border-radius: 16px; background: var(--card); border: 2px solid var(--outline); display: flex; align-items: center; gap: 12px; text-align: left; }
+.switch .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.switch .nm { font-size: 15px; font-weight: 800; }
+.switch .nm small { font-size: 12px; font-weight: 700; color: var(--muted); }
+.switch .ds { font-size: 12px; line-height: 1.4; }
+.knob { flex-shrink: 0; width: 52px; height: 30px; box-sizing: border-box; padding: 0 2px; border-radius: 15px; border: 2px solid var(--outline); background: var(--line); display: flex; align-items: center; justify-content: flex-start; }
+.knob i { width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; background: #FFFFFF; border: 2px solid var(--outline); }
+.switch[aria-checked="true"] .knob { background: var(--accent); justify-content: flex-end; }
+.seg { display: flex; gap: 8px; }
+.seg button { flex: 1; min-height: 46px; border-radius: 14px; border: 2px solid var(--outline); background: var(--card); font-family: var(--jp); font-weight: 600; }
+.seg .face { min-height: 64px; display: flex; align-items: center; justify-content: center; gap: 10px; font-family: var(--ui); font-size: 13px; font-weight: 800; }
+.seg .face .fs { font-size: 30px; line-height: 1; }
+#face-print .fs { font-family: var(--jp-print); font-weight: 500; }
+#face-hand .fs { font-family: var(--jp-hand); font-weight: 600; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-ink); }
+.notebox { padding: 10px 14px; border-radius: 16px; background: var(--note); font-size: 12px; line-height: 1.5; }
+.notebox b { font-weight: 800; }
+.credits { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.credits p { margin: 0 0 6px; }
+#looked { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+#looked li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 9px 2px; border-bottom: 2px solid var(--line); }
+#looked .w { font-family: var(--jp); font-size: 18px; font-weight: 600; }
+#looked .r { font-size: 12px; font-weight: 700; color: var(--muted); }
+#looked .g { flex: 1 1 100%; font-size: 13px; }
+#toast { position: fixed; z-index: 60; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 14px; background: var(--ink); color: var(--ground); font-size: 13px; font-weight: 700; }
+/* Aozora Bunko */
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 13px; font-weight: 800; }
+.check input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
+.sub-h { margin: 6px 0 0; font-size: 13px; font-weight: 800; color: var(--muted); }
+.tc-by { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.work-h { margin: 0; font-family: var(--jp); font-size: 24px; font-weight: 600; line-height: 1.35; text-wrap: balance; }
+.work-h small { display: block; font-size: 15px; color: var(--muted); }
+.work-by { font-family: var(--jp); font-size: 15px; font-weight: 600; }
+.parts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.parts li { display: flex; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 2px solid var(--line); }
+.parts .pt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.parts .pn { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.parts .ps { font-family: var(--jp); font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.parts .mini { flex-shrink: 0; min-width: 72px; }
+.mini.done { background: var(--accent-soft); border-color: var(--accent-ink); color: var(--accent-ink); }
+.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; font-weight: 700; line-height: 1.6; }
+.steps .linklike { display: inline; min-height: 0; padding: 4px 0; }
+@media (prefers-reduced-motion: reduce) { .track i { transition: none; } .btn:active, .text-card:active { transform: none; } }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <section class="view" id="v-lib">
+    <header class="bar">
+      <div class="brand"><span lang="ja">よむ</span> <small>Yaoki Reader</small></div>
+      <button class="pill" id="open-hints-a" type="button" aria-label="Hint settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.6"/><circle cx="8" cy="17" r="2.6"/></svg><span lang="ja">ヒント</span></button>
+    </header>
+    <div class="scroll">
+      <p class="hint" style="margin:0">Read Japanese with the furigana hidden. Touch a phrase to see its reading and meaning; let go and it hides again.</p>
+      <button class="btn" id="go-add" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span><span lang="ja">文を追加</span>　Add a text</span></button>
+      <button class="btn quiet" id="go-aoz" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5C6.5 4.5 9.5 4.5 12 6c2.5-1.5 5.5-1.5 8-.5V19c-2.5-1-5.5-1-8 .5-2.5-1.5-5.5-1.5-8-.5z"/><path d="M12 6v13.5"/></svg><span><span lang="ja">青空文庫から</span>　From Aozora Bunko</span></button>
+      <ul id="texts"></ul>
+      <div id="lib-state" class="hint"></div>
+      <div class="backup">
+        <button class="mini" id="export-lib" type="button">Save a backup</button>
+        <button class="mini" id="import-lib" type="button">Load a backup</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      </div>
+      <div class="foot-links">
+        <button class="linklike" id="open-credits" type="button">Dictionary credits and limits</button>
+        <a class="linklike" href="https://jorycook.github.io/Yaoki/">Yaoki app</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-add" hidden>
+    <header class="bar">
+      <button class="icon-btn lead" id="add-back" type="button" aria-label="Back to your texts"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="brand" style="font-size:17px"><span lang="ja">文を追加</span> <small>Add a text</small></div>
+    </header>
+    <form class="scroll" id="add-form" novalidate>
+      <div class="field">
+        <label for="add-title">Title <span class="hint">(optional)</span></label>
+        <input id="add-title" type="text" maxlength="60" autocomplete="off" lang="ja">
+      </div>
+      <div class="field">
+        <label for="add-text">Japanese text</label>
+        <textarea id="add-text" lang="ja" placeholder="ここに文章を貼り付けてください。"></textarea>
+        <div class="field-foot"><span>Paste or type. Line breaks are kept.</span><span id="add-count">0 / 30,000</span></div>
+      </div>
+      <div class="problem" id="add-problem" role="alert" hidden></div>
+      <div class="progress" id="add-progress" hidden>
+        <div class="track"><i id="add-bar"></i></div>
+        <div class="hint" id="add-status" role="status"></div>
+      </div>
+      <button class="btn" id="add-go" type="submit"><span><span lang="ja">読む</span>　Read it</span></button>
+      <p class="hint" style="margin:0">Readings and meanings are added automatically on your device. They are sometimes wrong, mostly for names and words with more than one reading.</p>
+      <button class="linklike" id="add-to-aoz" type="button">Or find a story or novel on Aozora Bunko</button>
+    </form>
+  </section>
+
+  <section class="view" id="v-aoz" hidden>
+    <header class="bar">
+      <button class="icon-btn lead" id="aoz-back" type="button" aria-label="Back"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="brand" style="font-size:17px"><span lang="ja">青空文庫</span> <small>Aozora Bunko</small></div>
+    </header>
+    <div class="scroll" id="aoz-scroll">
+      <div id="aoz-find" style="display:contents">
+        <p class="hint" style="margin:0">Aozora Bunko is a free library of Japanese writing that is out of copyright: stories, novels, essays and poems. Find a work by its title or author, in Japanese or in roman letters, or paste the address of its Aozora Bunko page.</p>
+        <form class="field" id="aoz-form" role="search" novalidate>
+          <label for="aoz-q">Title or author</label>
+          <input id="aoz-q" type="search" lang="ja" autocomplete="off" enterkeyhint="search" placeholder="蜘蛛の糸、宮沢賢治、soseki">
+        </form>
+        <label class="check"><input type="checkbox" id="aoz-modern" checked><span>Modern spelling only <span lang="ja">新字新仮名</span></span></label>
+        <div class="hint" id="aoz-state" role="status"></div>
+        <ul class="works" id="aoz-results"></ul>
+        <div class="notebox"><b>Downloaded a work from Aozora Bunko?</b> Load its .zip or .txt file here and it is read the same way.
+          <div><button class="linklike" id="aoz-file-btn" type="button">Load an Aozora Bunko file</button></div>
+        </div>
+      </div>
+      <div id="aoz-work" style="display:contents" hidden></div>
+    </div>
+    <input type="file" id="aoz-file" accept=".zip,.txt,application/zip,text/plain" hidden>
+  </section>
+
+  <section class="view" id="v-read" hidden>
+    <header class="bar">
+      <button class="icon-btn lead" id="read-back" type="button" aria-label="Back to your texts"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="bar-title" id="read-title" lang="ja"></div>
+      <button class="pill" id="open-hints-b" type="button" aria-label="Hint settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.6"/><circle cx="8" cy="17" r="2.6"/></svg><span lang="ja">ヒント</span></button>
+    </header>
+    <div class="scroll" id="read-scroll">
+      <div id="passage" lang="ja"></div>
+    </div>
+    <footer class="foot">
+      <div class="foot-label"><span lang="ja">のぞいた語句</span> <small class="hint">Looked up</small></div>
+      <div class="foot-count" id="read-count" aria-live="off">0 <small>/ 0</small></div>
+      <button class="pill" id="open-list" type="button"><span lang="ja">一覧</span> List</button>
+    </footer>
+  </section>
+
+</div>
+
+<div id="lens" hidden aria-live="polite"></div>
+
+<button class="scrim" id="scrim" type="button" aria-label="Close" hidden></button>
+
+<div class="sheet" id="sheet-hints" role="dialog" aria-labelledby="hints-h" hidden>
+  <h2 id="hints-h"><span lang="ja">触れたときに出すもの</span> <small>What a touch shows</small></h2>
+  <button class="switch" type="button" role="switch" id="sw-furi" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">ふりがな</span> <small>Furigana</small></span><span class="ds">Readings above the kanji, in the text and in the card.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <button class="switch" type="button" role="switch" id="sw-mean" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">語の意味</span> <small>Word meanings</small></span><span class="ds">English under each word. Particles are left untranslated.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <button class="switch" type="button" role="switch" id="sw-gram" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">文法メモ</span> <small>Grammar note</small></span><span class="ds">The pattern inside the phrase, such as 〜ながら.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <div class="field">
+    <label id="size-l"><span lang="ja">文字の大きさ</span> <span class="hint">Text size</span></label>
+    <div class="seg" role="group" aria-labelledby="size-l">
+      <button type="button" id="size-0" aria-pressed="false" style="font-size:15px" aria-label="Small text">あ</button>
+      <button type="button" id="size-1" aria-pressed="true" style="font-size:19px" aria-label="Medium text">あ</button>
+      <button type="button" id="size-2" aria-pressed="false" style="font-size:23px" aria-label="Large text">あ</button>
+    </div>
+  </div>
+  <div class="field">
+    <label id="face-l"><span lang="ja">書体</span> <span class="hint">Typeface</span></label>
+    <div class="seg" role="group" aria-labelledby="face-l">
+      <button type="button" class="face" id="face-print" aria-pressed="true"><span class="fs" lang="ja" aria-hidden="true">令</span><span><span lang="ja">明朝</span><br>Print</span></button>
+      <button type="button" class="face" id="face-hand" aria-pressed="false"><span class="fs" lang="ja" aria-hidden="true">令</span><span><span lang="ja">教科書体</span><br>Textbook</span></button>
+    </div>
+    <p class="hint" style="margin:0">Print matches books and documents. Textbook draws kanji the way you write them by hand, so a few look different, such as the 令 above.</p>
+  </div>
+  <div class="notebox"><b lang="ja">文の訳は出ません。</b> A touch never shows a whole-sentence translation. You get the pieces and put the sentence together yourself.</div>
+  <button class="btn" type="button" data-close><span><span lang="ja">とじる</span>　Close</span></button>
+</div>
+
+<div class="sheet" id="sheet-list" role="dialog" aria-labelledby="list-h" hidden>
+  <h2 id="list-h"><span lang="ja">のぞいた語句</span> <small>Looked up in this text</small></h2>
+  <ul id="looked"></ul>
+  <div class="empty" id="looked-empty" hidden>Nothing yet. Touch a phrase in the text and its main word is listed here.</div>
+  <button class="btn quiet" type="button" id="clear-list">Clear this list</button>
+  <button class="btn" type="button" data-close><span><span lang="ja">とじる</span>　Close</span></button>
+</div>
+
+<div class="sheet" id="sheet-credits" role="dialog" aria-labelledby="credits-h" hidden>
+  <h2 id="credits-h">Dictionary credits and limits</h2>
+  <div class="credits">
+    <p><b>Word meanings</b> come from JMdict (2020 edition), the property of the Electronic Dictionary Research and Development Group, used in conformance with the Group's licence (Creative Commons Attribution-ShareAlike). The shortened word list this page loads is derived from it and is offered under the same licence.</p>
+    <p><b>Word splitting and readings</b> use kuromoji.js (Apache-2.0) with the IPA dictionary from the mecab-ipadic project. That dictionary predates 2019, so for words it only knows in pieces (令和, 一本, 八日) the reading is taken from JMdict instead.</p>
+    <p><b>Typefaces:</b> Noto Serif JP (print) and Klee One (textbook), both under the SIL Open Font License.</p>
+    <p><b>Limits.</b> Everything is worked out by rule on your device, with no person checking it. Readings can be wrong where a word has several (降る and 降りる, 今日, names). Meanings show the first common sense of a word, which is not always the one the sentence uses. Grammar notes cover about ninety common patterns. Older spelling (旧仮名遣い) is not handled well.</p>
+    <p><b>Aozora Bunko</b> (青空文庫, aozora.gr.jp) is a library of Japanese works whose copyright has ended, typed in and checked by volunteers. The list of works this page searches is made from Aozora Bunko's own index and holds only works out of copyright. The texts are fetched from aozorahack's copy of Aozora Bunko's files on GitHub, since Aozora Bunko's own site cannot be read by other pages; works added or corrected since that copy was last updated can be loaded from the file Aozora Bunko offers for download. Ruby (furigana) and notes in Aozora's text format are taken out, so the readings you see are this page's own.</p>
+    <p><b>Your texts.</b> Text you add is saved so you can come back to it. Only add text you are free to keep a copy of.</p>
+    <p>Full licence texts: <a href="licenses.txt">licenses.txt</a>.</p>
+  </div>
+  <button class="btn" type="button" data-close><span><span lang="ja">とじる</span>　Close</span></button>
+</div>
+
+<div id="toast" role="status" hidden></div>
+
+<script src="aozora/aozora.js"></script>
+<script>
+(function () {
+'use strict';
+
+var AV = 4;            /* analysis version the engine produces */
+var MAX = 30000;       /* characters per text */
+var SAMPLE = { id: 'sample', sample: true, title: '片目のだるま', created: 0,
+  text: '祖母の家の棚に、片目だけ黒いだるまが置いてある。試験に合格したら、もう片方の目を入れるのだと祖母は言った。私は毎晩そのだるまを見ながら、辞書を引かずに本を読む練習を続けている。分からない言葉は、前後の文から意味を考えるようにしたら、少しずつ読めるようになってきた。' };
+var SAMPLE_AN = {"v":4,"paras":[[{"w":[{"s":[["祖母","そぼ"]],"e":"grandmother"},{"s":[["の",""]],"f":1}],"d":["祖母","そぼ","grandmother"]},{"w":[{"s":[["家","いえ"]],"e":"house, residence"},{"s":[["の",""]],"f":1}],"d":["家","いえ","house, residence"]},{"w":[{"s":[["棚","たな"]],"e":"shelf, ledge"},{"s":[["に",""]],"f":1}],"t":"、","d":["棚","たな","shelf, ledge"]},{"w":[{"s":[["片目","かため"]],"e":"one eye, one of one's eyes"},{"s":[["だけ",""]],"f":1}],"g":[["〜だけ","only; just"]],"d":["片目","かため","one eye, one of one's eyes"]},{"w":[{"s":[["黒","くろ"],["い",""]],"e":"black"}],"d":["黒い","くろい","black"]},{"w":[{"s":[["だるま",""]],"e":"daruma, tumbling doll"},{"s":[["が",""]],"f":1}],"d":["だるま","","daruma, tumbling doll"]},{"w":[{"s":[["置","お"],["いてある",""]],"e":"to put, to place"}],"g":[["〜てある","has been done and stays so"]],"t":"。","d":["置く","おく","to put, to place"]},{"w":[{"s":[["試験","しけん"]],"e":"examination, exam"},{"s":[["に",""]],"f":1}],"d":["試験","しけん","examination, exam"]},{"w":[{"s":[["合格","ごうかく"],["したら",""]],"e":"success, passing (e.g. exam)"}],"g":[["〜たら","when; if; once"]],"t":"、","d":["合格","ごうかく","success, passing (e.g. exam)"]},{"w":[{"s":[["もう",""]],"e":"now, soon"}],"d":["もう","","now, soon"]},{"w":[{"s":[["片方","かたほう"]],"e":"one side, one party"},{"s":[["の",""]],"f":1}],"d":["片方","かたほう","one side, one party"]},{"w":[{"s":[["目","め"]],"e":"eye, eyeball"},{"s":[["を",""]],"f":1}],"d":["目","め","eye, eyeball"]},{"w":[{"s":[["入","い"],["れる",""]],"e":"to put in, to let in"},{"s":[["のだ",""]],"f":1},{"s":[["と",""]],"f":1}],"g":[["〜のだ","explains or stresses the situation"]],"d":["入れる","いれる","to put in, to let in"]},{"w":[{"s":[["祖母","そぼ"]],"e":"grandmother"},{"s":[["は",""]],"f":1}],"d":["祖母","そぼ","grandmother"]},{"w":[{"s":[["言","い"],["った",""]],"e":"to say, to utter"}],"t":"。","d":["言う","いう","to say, to utter"]},{"w":[{"s":[["私","わたし"]],"e":"I, me"},{"s":[["は",""]],"f":1}],"d":["私","わたし","I, me"]},{"w":[{"s":[["毎晩","まいばん"]],"e":"every night"}],"d":["毎晩","まいばん","every night"]},{"w":[{"s":[["その",""]],"e":"that, the"},{"s":[["だるま",""]],"e":"daruma, tumbling doll"},{"s":[["を",""]],"f":1}],"d":["だるま","","daruma, tumbling doll"]},{"w":[{"s":[["見","み"],["ながら",""]],"e":"to see, to look"}],"g":[["〜ながら","while doing"]],"t":"、","d":["見る","みる","to see, to look"]},{"w":[{"s":[["辞書","じしょ"],["を",""],["引","ひ"],["かず",""]],"e":"to consult a dictionary"},{"s":[["に",""]],"f":1}],"g":[["〜ずに","without doing"]],"d":["辞書を引く","じしょをひく","to consult a dictionary"]},{"w":[{"s":[["本","ほん"]],"e":"book, volume"},{"s":[["を",""]],"f":1}],"d":["本","ほん","book, volume"]},{"w":[{"s":[["読","よ"],["む",""]],"e":"to read"}],"d":["読む","よむ","to read"]},{"w":[{"s":[["練習","れんしゅう"]],"e":"practice, training"},{"s":[["を",""]],"f":1}],"d":["練習","れんしゅう","practice, training"]},{"w":[{"s":[["続","つづ"],["けている",""]],"e":"to continue, to keep up"}],"g":[["〜ている","is doing; ongoing state"]],"t":"。","d":["続ける","つづける","to continue, to keep up"]},{"w":[{"s":[["分","わ"],["からない",""]],"e":"to understand, to comprehend"}],"g":[["〜ない","not"]],"d":["分かる","わかる","to understand, to comprehend"]},{"w":[{"s":[["言葉","ことば"]],"e":"language, dialect"},{"s":[["は",""]],"f":1}],"t":"、","d":["言葉","ことば","language, dialect"]},{"w":[{"s":[["前後","ぜんご"]],"e":"front and rear, front and back"},{"s":[["の",""]],"f":1}],"d":["前後","ぜんご","front and rear, front and back"]},{"w":[{"s":[["文","ぶん"]],"e":"sentence"},{"s":[["から",""]],"f":1}],"d":["文","ぶん","sentence"]},{"w":[{"s":[["意味","いみ"]],"e":"meaning, significance"},{"s":[["を",""]],"f":1}],"d":["意味","いみ","meaning, significance"]},{"w":[{"s":[["考","かんが"],["える",""]],"e":"to think (about, of)"},{"s":[["よう",""]],"e":"manner; way"},{"s":[["に",""]],"f":1}],"g":[["〜ようにする","make a point of doing"]],"d":["考える","かんがえる","to think (about, of)"]},{"w":[{"s":[["したら",""]],"e":"to do, to carry out"}],"g":[["〜たら","when; if; once"]],"t":"、","d":["する","","to do, to carry out"]},{"w":[{"s":[["少","すこ"],["し",""]],"e":"small quantity, little"},{"s":[["ずつ",""]],"f":1}],"d":["少し","すこし","small quantity, little"]},{"w":[{"s":[["読","よ"],["める",""]],"e":"can read"},{"s":[["よう",""]],"e":"manner; way"},{"s":[["に",""]],"f":1}],"g":[["〜ようになる","come to; reach the point where"]],"d":["読める","","can read"]},{"w":[{"s":[["なってきた",""]],"e":"to become, to get"}],"g":[["〜てくる","come to; has been doing up to now"]],"t":"。","d":["なる","","to become, to get"]}]]};
+
+function $(id) { return document.getElementById(id); }
+function el(tag, cls, text) {
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+var LS = {
+  get: function (k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+};
+function num(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+var S = {
+  mode: 'pending', db: null, texts: [], cur: null, chunks: [], seen: [], held: -1,
+  settings: Object.assign({ furi: true, mean: true, gram: true, size: 1, face: 'print' }, LS.get('yomu.settings', {})),
+  confirmId: null,
+};
+
+/* ---------- toast ---------- */
+var toastTimer = 0;
+function toast(msg) {
+  var t = $('toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.hidden = true; }, 4200);
+}
+
+/* ---------- settings ---------- */
+function applySettings() {
+  var s = S.settings, b = document.body.classList;
+  b.toggle('no-furi', !s.furi); b.toggle('no-mean', !s.mean); b.toggle('no-gram', !s.gram);
+  document.documentElement.style.setProperty('--read', [17, 19, 22][s.size] + 'px');
+  $('sw-furi').setAttribute('aria-checked', String(!!s.furi));
+  $('sw-mean').setAttribute('aria-checked', String(!!s.mean));
+  $('sw-gram').setAttribute('aria-checked', String(!!s.gram));
+  [0, 1, 2].forEach(function (i) { $('size-' + i).setAttribute('aria-pressed', String(s.size === i)); });
+  b.toggle('face-hand', s.face === 'hand');
+  $('face-print').setAttribute('aria-pressed', String(s.face !== 'hand'));
+  $('face-hand').setAttribute('aria-pressed', String(s.face === 'hand'));
+}
+function setSetting(k, v) { S.settings[k] = v; LS.set('yomu.settings', S.settings); applySettings(); }
+
+/* ---------- analysis cache (this browser) ---------- */
+var AN = {
+  mem: new Map(), dbp: null,
+  open: function () {
+    if (this.dbp) return this.dbp;
+    this.dbp = new Promise(function (res) {
+      try {
+        var r = indexedDB.open('yomu-reader', 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore('an'); };
+        r.onsuccess = function () { res(r.result); };
+        r.onerror = function () { res(null); };
+        r.onblocked = function () { res(null); };
+      } catch (e) { res(null); }
+    });
+    return this.dbp;
+  },
+  get: function (id) {
+    var self = this;
+    if (this.mem.has(id)) return Promise.resolve(this.mem.get(id));
+    return this.open().then(function (d) {
+      if (!d) return null;
+      return new Promise(function (res) {
+        try {
+          var q = d.transaction('an').objectStore('an').get(id);
+          q.onsuccess = function () { if (q.result) self.mem.set(id, q.result); res(q.result || null); };
+          q.onerror = function () { res(null); };
+        } catch (e) { res(null); }
+      });
+    });
+  },
+  put: function (id, an) {
+    this.mem.set(id, an);
+    return this.open().then(function (d) { try { if (d) d.transaction('an', 'readwrite').objectStore('an').put(an, id); } catch (e) {} });
+  },
+  del: function (id) {
+    this.mem.delete(id);
+    return this.open().then(function (d) { try { if (d) d.transaction('an', 'readwrite').objectStore('an').delete(id); } catch (e) {} });
+  },
+};
+
+/* ---------- engine (worker, with a same-thread fallback) ---------- */
+var ENG = {
+  ready: null, worker: null, direct: null, jobs: new Map(), seq: 0, onProgress: null,
+  progress: function (d, t) { if (this.onProgress) this.onProgress(d, t); },
+  start: function () {
+    var self = this;
+    if (this.ready) return this.ready;
+    this.ready = new Promise(function (resolve, reject) {
+      function sameThread() {
+        var files = ['engine/kuromoji.js', 'engine/analyzer.js', 'engine/boot.js'];
+        files.reduce(function (p, src) {
+          return p.then(function () {
+            return new Promise(function (ok, bad) {
+              var s = document.createElement('script');
+              s.src = src; s.onload = ok; s.onerror = function () { bad(new Error('could not load ' + src)); };
+              document.head.appendChild(s);
+            });
+          });
+        }, Promise.resolve()).then(function () {
+          return window.YomuBoot('engine/', function (d, t) { self.progress(d, t); });
+        }).then(function (e) { self.direct = e; resolve(); }).catch(reject);
+      }
+      var w, settled = false;
+      try { w = new Worker('engine/worker.js'); } catch (e) { sameThread(); return; }
+      w.onmessage = function (ev) {
+        var m = ev.data || {};
+        if (m.type === 'progress') self.progress(m.done, m.total);
+        else if (m.type === 'ready') { settled = true; self.worker = w; resolve(); }
+        else if (m.type === 'error') { if (!settled) { settled = true; try { w.terminate(); } catch (e) {} reject(new Error(m.message)); } }
+        else if (m.type === 'result' || m.type === 'fail') {
+          var j = self.jobs.get(m.id);
+          if (!j) return;
+          self.jobs.delete(m.id);
+          if (m.type === 'result') j.resolve(m.analysis); else j.reject(new Error(m.message));
+        }
+      };
+      w.onerror = function () { if (!settled) { settled = true; try { w.terminate(); } catch (e) {} sameThread(); } };
+      w.postMessage({ type: 'init' });
+    });
+    this.ready.catch(function () { self.ready = null; });
+    return this.ready;
+  },
+  analyze: function (text) {
+    var self = this;
+    return this.start().then(function () {
+      if (self.direct) return self.direct.analyze(text);
+      return new Promise(function (resolve, reject) {
+        var id = ++self.seq;
+        self.jobs.set(id, { resolve: resolve, reject: reject });
+        self.worker.postMessage({ type: 'analyze', id: id, text: text });
+      });
+    });
+  },
+};
+function countPhrases(an) {
+  var n = 0;
+  an.paras.forEach(function (p) { p.forEach(function (c) { if (c.w) n++; }); });
+  return n;
+}
+function progressText(d, t) {
+  return d < t ? 'Loading the dictionary: part ' + d + ' of ' + t + '. It is about 36 MB the first time; after that it is kept on this device.' : 'Reading your text.';
+}
+
+/* ---------- saved texts ---------- */
+function initStore() {
+  var use = window.claude && window.claude.use ? window.claude.use('db') : Promise.resolve(null);
+  return Promise.resolve(use).catch(function () { return null; }).then(function (db) {
+    if (!db) return null;
+    return db.collection('texts').orderBy('created', 'desc').limit(200).get().then(function (snap) {
+      S.db = db; S.mode = 'db';
+      S.texts = snap.docs.map(function (d) {
+        var x = d.data() || {};
+        return { id: d.id, title: x.title || '', by: x.by || '', text: x.text || '', created: x.created || 0, seen: (x.seen || []).slice(), n: x.n || 0, av: x.av || 0 };
+      });
+      return true;
+    }).catch(function () { return null; });
+  }).then(function (ok) {
+    if (!ok) { S.mode = 'local'; S.texts = LS.get('yomu.texts', []); }
+    renderLibrary();
+  });
+}
+function saveLocal() { return LS.set('yomu.texts', S.texts.filter(function (t) { return !t.temp; })); }
+function createText(t) {
+  if (S.mode === 'db') {
+    var ref = S.db.collection('texts').doc();
+    return ref.set({ title: t.title, by: t.by || '', text: t.text, created: t.created, seen: (t.seen || []).slice(), n: t.n, av: t.av }).then(function () { t.id = ref.id; });
+  }
+  t.id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  S.texts.unshift(t);
+  var ok = saveLocal();
+  S.texts.shift();
+  return ok ? Promise.resolve() : Promise.reject(new Error('this browser would not store it'));
+}
+var seenTimer = 0;
+function persistSeen(t) {
+  if (t.sample) { LS.set('yomu.sample.seen', t.seen); return; }
+  if (t.temp) return;
+  if (S.mode === 'db') {
+    S.db.collection('texts').doc(t.id).update({ seen: t.seen.slice(), n: t.n, av: t.av }).catch(function () {});
+  } else saveLocal();
+}
+function queueSeen() {
+  var t = S.cur;
+  clearTimeout(seenTimer);
+  seenTimer = setTimeout(function () { persistSeen(t); }, 1500);
+}
+function removeText(t) {
+  var p = S.mode === 'db' ? S.db.collection('texts').doc(t.id).delete() : Promise.resolve();
+  return p.then(function () {
+    S.texts = S.texts.filter(function (x) { return x !== t; });
+    if (S.mode !== 'db') saveLocal();
+    AN.del(t.id);
+  });
+}
+
+/* ---------- views ---------- */
+function show(view) {
+  ['lib', 'add', 'aoz', 'read'].forEach(function (v) { $('v-' + v).hidden = v !== view; });
+  release();
+}
+function firstLine(text) { return text.replace(/\s+/g, ' ').trim(); }
+
+function renderLibrary() {
+  var list = $('texts');
+  list.textContent = '';
+  var all = S.texts.concat([Object.assign({}, SAMPLE, { seen: LS.get('yomu.sample.seen', []), n: countPhrases(SAMPLE_AN) })]);
+  all.forEach(function (t) {
+    var li = el('li');
+    if (S.confirmId && S.confirmId === t.id) {
+      var box = el('div', 'confirm');
+      box.appendChild(el('span', null, 'Delete “' + t.title + '” and its looked-up list?'));
+      var yes = el('button', 'mini danger', 'Delete'); yes.type = 'button';
+      var no = el('button', 'mini', 'Keep'); no.type = 'button';
+      yes.addEventListener('click', function () {
+        S.confirmId = null;
+        removeText(t).then(renderLibrary, function () { toast('Could not delete it. Try again.'); renderLibrary(); });
+      });
+      no.addEventListener('click', function () { S.confirmId = null; renderLibrary(); });
+      box.appendChild(yes); box.appendChild(no);
+      li.appendChild(box);
+    } else {
+      var card = el('button', 'text-card'); card.type = 'button';
+      var top = el('span', 'tc-top');
+      var title = el('span', 'tc-title', t.title); title.lang = 'ja';
+      top.appendChild(title);
+      if (t.sample) top.appendChild(el('span', 'tag', 'Sample'));
+      card.appendChild(top);
+      if (t.by) { var by = el('span', 'tc-by', t.by); by.lang = 'ja'; card.appendChild(by); }
+      var prev = el('span', 'tc-prev', firstLine(t.text).slice(0, 60)); prev.lang = 'ja';
+      card.appendChild(prev);
+      var seen = (t.seen || []).length;
+      card.appendChild(el('span', 'tc-meta', num(t.text.length) + ' characters · looked up ' + seen + (t.n ? ' of ' + num(t.n) + ' phrases' : '')));
+      card.addEventListener('click', function () { openReader(t.sample ? SAMPLE : t); });
+      li.appendChild(card);
+      if (!t.sample) {
+        var del = el('button', 'icon-btn'); del.type = 'button';
+        del.setAttribute('aria-label', 'Delete ' + t.title);
+        del.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+        del.addEventListener('click', function () { S.confirmId = t.id; renderLibrary(); });
+        li.appendChild(del);
+      }
+    }
+    list.appendChild(li);
+  });
+  var st = $('lib-state');
+  if (S.mode === 'pending') st.textContent = 'Looking for your saved texts.';
+  else if (S.mode === 'db') st.textContent = S.texts.length ? 'Your texts are saved with this page, so they are here on any device where you open it.' : 'Texts you add are saved with this page and listed here, above the sample.';
+  else st.textContent = S.texts.length ? 'Your texts are saved in this browser only. To read them on another device, save a backup here and load it there.' : 'Texts you add are saved in this browser and listed here, above the sample. A backup from another device can be loaded below.';
+  $('export-lib').hidden = !S.texts.some(function (t) { return !t.temp; });
+}
+
+/* ---------- backups: the whole library as one file, to carry it to another device or browser ---------- */
+var BACKUP_APP = 'yaoki-reader';
+function exportLibrary() {
+  var list = S.texts.filter(function (t) { return !t.temp; }).map(function (t) {
+    return { title: t.title, by: t.by || '', text: t.text, created: t.created, seen: (t.seen || []).slice(), n: t.n || 0, av: t.av || 0 };
+  });
+  if (!list.length) { toast('There are no texts of yours to save yet.'); return; }
+  var data = { app: BACKUP_APP, version: 1, exported: new Date().toISOString(), texts: list };
+  var url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+  var a = el('a');
+  a.href = url;
+  a.download = 'yaoki-reader-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+  toast('Saved ' + list.length + (list.length === 1 ? ' text' : ' texts') + ' to a file. Load it on another device to read them there.');
+}
+function cleanEntry(x) {
+  if (!x || typeof x.text !== 'string' || !x.text.trim()) return null;
+  var text = x.text.slice(0, MAX);
+  var title = (typeof x.title === 'string' && x.title.trim() ? x.title.trim() : firstLine(text).slice(0, 16)).slice(0, 60);
+  var seen = Array.isArray(x.seen) ? x.seen.filter(function (i) { return typeof i === 'number' && i >= 0 && i % 1 === 0; }) : [];
+  var by = typeof x.by === 'string' ? x.by.trim().slice(0, 60) : '';
+  return { title: title, by: by, text: text, created: typeof x.created === 'number' ? x.created : Date.now(), seen: seen,
+    n: typeof x.n === 'number' ? x.n : 0, av: typeof x.av === 'number' ? x.av : 0 };
+}
+function importLibrary(file) {
+  var reader = new FileReader();
+  reader.onerror = function () { toast('That file could not be read.'); };
+  reader.onload = function () {
+    var data;
+    try { data = JSON.parse(String(reader.result)); } catch (e) { data = null; }
+    if (!data || data.app !== BACKUP_APP || !Array.isArray(data.texts)) { toast('That is not a Yaoki Reader backup.'); return; }
+    var have = {};
+    S.texts.forEach(function (t) { have[t.text] = 1; });
+    var fresh = [], same = 0;
+    data.texts.forEach(function (x) {
+      var t = cleanEntry(x);
+      if (!t) return;
+      if (have[t.text]) { same++; return; }
+      have[t.text] = 1;
+      fresh.push(t);
+    });
+    var added = 0;
+    fresh.reduce(function (p, t) {
+      return p.then(function () { return createText(t).then(function () { S.texts.unshift(t); added++; }); });
+    }, Promise.resolve()).then(function () {
+      return null;
+    }, function (err) {
+      return err;
+    }).then(function (err) {
+      S.texts.sort(function (a, b) { return b.created - a.created; });
+      if (S.mode !== 'db') saveLocal();
+      renderLibrary();
+      var msg = added ? 'Loaded ' + added + (added === 1 ? ' text' : ' texts') + '.' : 'Nothing new to load.';
+      if (same) msg += ' ' + same + (same === 1 ? ' was' : ' were') + ' already here.';
+      if (err) msg += ' The rest could not be saved (' + ((err && err.message) || 'unknown') + ').';
+      toast(msg);
+    });
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- add a text ---------- */
+var adding = false;
+function addCount() {
+  var n = $('add-text').value.length, c = $('add-count');
+  c.textContent = num(n) + ' / ' + num(MAX);
+  c.className = n > MAX ? 'over' : '';
+}
+function addProblem(msg) { var p = $('add-problem'); p.textContent = msg || ''; p.hidden = !msg; }
+function addBusy(on) {
+  adding = on;
+  $('add-go').disabled = on;
+  $('add-progress').hidden = !on;
+  if (on) { $('add-bar').style.width = '3%'; $('add-status').textContent = 'Loading the dictionary.'; }
+}
+function submitAdd(e) {
+  e.preventDefault();
+  if (adding) return;
+  var text = $('add-text').value.replace(/^\s+|\s+$/g, '');
+  addProblem('');
+  if (!text) { addProblem('Paste some Japanese text first.'); return; }
+  if (text.length > MAX) { addProblem('This is ' + num(text.length) + ' characters. The limit is ' + num(MAX) + ', so add it in parts, such as one chapter at a time.'); return; }
+  if (!/[぀-ヿ㐀-鿿]/.test(text)) { addProblem('This does not look like Japanese text.'); return; }
+  var title = ($('add-title').value.trim() || firstLine(text).slice(0, 16)).slice(0, 60);
+  addBusy(true);
+  ENG.onProgress = function (d, t) {
+    $('add-bar').style.width = Math.max(3, Math.round(d / t * 100)) + '%';
+    $('add-status').textContent = progressText(d, t);
+  };
+  ENG.analyze(text).then(function (an) {
+    var t = { title: title, text: text, created: Date.now(), seen: [], n: countPhrases(an), av: an.v };
+    return createText(t).catch(function (err) {
+      t.temp = true; t.id = 'temp' + Date.now();
+      toast('Could not save this text (' + ((err && err.code) || (err && err.message) || 'unknown') + '). You can read it now, but it will be gone when you leave.');
+    }).then(function () {
+      S.texts.unshift(t);
+      AN.put(t.id, an);
+      $('add-text').value = ''; $('add-title').value = ''; addCount();
+      addBusy(false);
+      renderLibrary();
+      openReader(t, an);
+    });
+  }).catch(function (err) {
+    addBusy(false);
+    addProblem('The dictionary did not load (' + ((err && err.message) || 'unknown error') + '). Check your connection and press Read it again.');
+  });
+}
+
+/* ---------- Aozora Bunko: find a work, fetch it or read its downloaded file, add it in parts ---------- */
+var AZ = window.YomuAozora;
+var PART = 12000;      /* a part of a long work is about this many characters, never more than MAX */
+var PICKS = [92, 637, 628, 43754, 473, 1567, 799, 42, 127, 43015];   /* short works to start with */
+var Z = { cat: null, catP: null, jisP: null, work: null, parts: [], added: [], busy: false, seq: 0 };
+
+function loadCatalog() {
+  if (!Z.catP) {
+    Z.catP = fetch('aozora/catalog.txt').then(function (r) {
+      if (!r.ok) throw new Error('answered ' + r.status);
+      return r.text();
+    }).then(function (t) { Z.cat = AZ.parseCatalog(t); return Z.cat; });
+    Z.catP.catch(function () { Z.catP = null; });
+  }
+  return Z.catP;
+}
+function loadJisTable() {
+  if (!Z.jisP) Z.jisP = fetch('aozora/jisx0213.json').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+  return Z.jisP;
+}
+function openAozora() {
+  show('aoz');
+  aozPanel('find');
+  aozSearch();
+  loadCatalog().then(aozSearch, function (err) {
+    $('aoz-state').textContent = 'The list of works did not load (' + ((err && err.message) || 'unknown error') + '). Check your connection and try again.';
+  });
+}
+function aozPanel(which) {
+  $('aoz-find').hidden = which !== 'find';
+  $('aoz-work').hidden = which !== 'work';
+  $('aoz-scroll').scrollTop = 0;
+}
+function kindTag(w) { return w.kind === 0 ? null : el('span', 'tag', w.kind === 4 ? AZ.KINDS[4] : 'Old spelling'); }
+function workCard(w) {
+  var li = el('li');
+  var card = el('button', 'text-card'); card.type = 'button';
+  var top = el('span', 'tc-top');
+  var title = el('span', 'tc-title', w.title + (w.sub ? '　' + w.sub : '')); title.lang = 'ja';
+  top.appendChild(title);
+  var tag = kindTag(w);
+  if (tag) top.appendChild(tag);
+  card.appendChild(top);
+  var by = el('span', 'tc-by', w.by + (w.trans ? '　' + w.trans + ' 訳' : '')); by.lang = 'ja';
+  card.appendChild(by);
+  card.addEventListener('click', function () { openWork(w); });
+  li.appendChild(card);
+  return li;
+}
+function aozSearch() {
+  var list = $('aoz-results'), st = $('aoz-state'), q = $('aoz-q').value;
+  list.textContent = '';
+  if (!Z.cat) { st.textContent = 'Loading the list of works.'; return; }
+  if (!q.trim()) {
+    var picks = PICKS.map(function (id) { return Z.cat.byId[id]; }).filter(Boolean);
+    st.textContent = '';
+    var h = el('li'); h.appendChild(el('h3', 'sub-h', 'Short works to start with')); list.appendChild(h);
+    picks.forEach(function (w) { list.appendChild(workCard(w)); });
+    return;
+  }
+  var r = AZ.search(Z.cat, q, { modern: $('aoz-modern').checked });
+  r.works.forEach(function (w) { list.appendChild(workCard(w)); });
+  if (!r.total) {
+    var all = $('aoz-modern').checked ? AZ.search(Z.cat, q, {}).total : 0;
+    st.textContent = all
+      ? 'No works in modern spelling match. ' + all + (all === 1 ? ' work in old spelling does' : ' works in old spelling do') + ': clear “Modern spelling only” to see ' + (all === 1 ? 'it' : 'them') + '.'
+      : r.url ? 'That work is not in the list. Only works out of copyright are listed.'
+      : 'No works match. Only works out of copyright are listed; try the author’s name, or part of the title.';
+  } else st.textContent = r.total > r.works.length ? 'The first ' + r.works.length + ' of ' + num(r.total) + ' works. Type more to narrow it down.' : num(r.total) + (r.total === 1 ? ' work' : ' works') + '.';
+}
+
+/* a work: w is its catalog entry, or null for a file someone loaded (then info holds what the file says) */
+function openWork(w, info) {
+  var seq = ++Z.seq;
+  Z.work = w; Z.parts = []; Z.added = [];
+  aozPanel('work');
+  var box = $('aoz-work');
+  box.textContent = '';
+  var title = w ? w.title : info.title, sub = w ? w.sub : '';
+  var by = w ? w.by + (w.trans ? '　' + w.trans + ' 訳' : '') : info.author;
+  Z.meta = { title: title || 'Untitled', by: by || '' };
+  var h = el('h2', 'work-h', title || 'Untitled'); h.lang = 'ja';
+  if (sub) { var sm = el('small', null, sub); h.appendChild(sm); }
+  box.appendChild(h);
+  if (by) { var b = el('div', 'work-by', by); b.lang = 'ja'; box.appendChild(b); }
+  if (w) {
+    var links = el('div', 'foot-links');
+    var a = el('a', 'linklike', 'Its page on Aozora Bunko'); a.href = AZ.cardUrl(w); a.target = '_blank'; a.rel = 'noopener';
+    links.appendChild(a);
+    box.appendChild(links);
+    if (w.kind !== 0) box.appendChild(el('div', 'notebox', 'This work is in old spelling (' + AZ.KINDS[w.kind] + '). Readings and meanings are often wrong for old spelling, so a work marked 新字新仮名 is easier to start with.'));
+  }
+  var status = el('div', 'progress');
+  var msg = el('div', 'hint', w ? 'Fetching the text.' : 'Reading the file.'); msg.setAttribute('role', 'status');
+  status.appendChild(msg);
+  box.appendChild(status);
+  var got = w ? AZ.fetchWork(w).then(function (r) { return r.raw; }) : Promise.resolve(info.raw);
+  got.then(function (raw) {
+    return (AZ.needsTable(raw) ? loadJisTable() : Promise.resolve(null)).then(function (jis) { return AZ.parseText(raw, jis); });
+  }).then(function (parsed) {
+    if (seq !== Z.seq) return;
+    status.remove();
+    Z.parts = AZ.splitParts(parsed.lines, PART, MAX);
+    if (!Z.parts.length) { box.appendChild(el('div', 'problem', 'There is no text in it to read.')); return; }
+    renderParts(box);
+  }).catch(function (err) {
+    if (seq !== Z.seq) return;
+    status.remove();
+    if (!w) { box.appendChild(el('div', 'problem', 'That file could not be read (' + ((err && err.message) || 'unknown error') + ').')); return; }
+    box.appendChild(el('div', 'problem', err && err.missing
+      ? 'This work could not be fetched here: it was added to Aozora Bunko, or corrected, after the copy this page reads from was made.'
+      : 'The text could not be fetched (' + ((err && err.message) || 'unknown error') + '). Check your connection and try again.'));
+    var p = el('p', 'hint', 'You can still add it from Aozora Bunko’s own file:'); p.style.margin = '0';
+    box.appendChild(p);
+    var ol = el('ol', 'steps');
+    var s1 = el('li'), dl = el('a', 'linklike', 'Download the work’s zip file'); dl.href = AZ.zipUrl(w); dl.target = '_blank'; dl.rel = 'noopener';
+    s1.appendChild(dl); s1.appendChild(document.createTextNode(' from Aozora Bunko.'));
+    var s2 = el('li'), ld = el('button', 'linklike', 'Load that file here'); ld.type = 'button';
+    ld.addEventListener('click', pickAozoraFile);
+    s2.appendChild(ld); s2.appendChild(document.createTextNode('. It is read on your device; you do not need to unzip it.'));
+    ol.appendChild(s1); ol.appendChild(s2);
+    box.appendChild(ol);
+    if (!err || !err.missing) {
+      var again = el('button', 'btn quiet', 'Try again'); again.type = 'button';
+      again.addEventListener('click', function () { openWork(w); });
+      box.appendChild(again);
+    }
+  });
+}
+function partTitle(i) {
+  var n = Z.parts.length, tail = n > 1 ? '（' + (i + 1) + '/' + n + '）' : '';
+  return Z.meta.title.slice(0, 60 - tail.length) + tail;
+}
+function existing(text) { return S.texts.filter(function (t) { return t.text === text; })[0] || null; }
+function renderParts(box) {
+  var n = Z.parts.length, total = 0;
+  Z.parts.forEach(function (p) { total += p.text.length; });
+  Z.added = Z.parts.map(function (p) { return existing(p.text); });
+  var list = el('ul', 'parts');
+  box.appendChild(el('div', 'hint', num(total) + ' characters' + (n > 1 ? ', in ' + n + ' parts. Each part is a text of its own in your library, so you can read one at a time.' : '.')));
+  if (n > 1) {
+    var all = el('button', 'btn', ''); all.type = 'button'; all.id = 'aoz-add-all';
+    box.appendChild(all);
+  }
+  Z.parts.forEach(function (p, i) {
+    var li = el('li');
+    var tx = el('span', 'pt');
+    tx.appendChild(el('span', 'pn', (n > 1 ? 'Part ' + (i + 1) + ' of ' + n + ' · ' : '') + num(p.text.length) + ' characters'));
+    var s = el('span', 'ps', p.head ? p.head + '　' + p.start : p.start); s.lang = 'ja';
+    tx.appendChild(s);
+    li.appendChild(tx);
+    var b = el('button', 'mini'); b.type = 'button'; b.setAttribute('data-part', i);
+    b.addEventListener('click', function () {
+      if (Z.added[i]) { openReader(Z.added[i]); return; }
+      addParts([i]).then(function (ok) { if (ok && n === 1) openReader(Z.added[i]); });
+    });
+    li.appendChild(b);
+    list.appendChild(li);
+  });
+  box.appendChild(list);
+  if (all) all.addEventListener('click', function () {
+    var todo = [];
+    Z.added.forEach(function (t, i) { if (!t) todo.push(i); });
+    if (!todo.length) { show('lib'); renderLibrary(); return; }
+    addParts(todo).then(function (ok) {
+      if (!ok) return;
+      show('lib'); renderLibrary();
+      toast('Added ' + todo.length + (todo.length === 1 ? ' part' : ' parts') + ' of ' + Z.meta.title + '. Each one is prepared when you first open it.');
+    });
+  });
+  partButtons();
+}
+function partButtons() {
+  var n = Z.parts.length;
+  Array.prototype.forEach.call(document.querySelectorAll('#aoz-work [data-part]'), function (b) {
+    var t = Z.added[+b.getAttribute('data-part')];
+    b.textContent = t ? 'Read' : n === 1 ? 'Add and read' : 'Add';
+    b.className = t ? 'mini done' : 'mini';
+    b.disabled = Z.busy;
+  });
+  var all = $('aoz-add-all');
+  if (all) {
+    var left = Z.added.filter(function (t) { return !t; }).length;
+    all.textContent = left === n ? 'Add all ' + n + ' parts' : left ? 'Add the other ' + left + (left === 1 ? ' part' : ' parts') : 'All parts are in your library';
+    all.disabled = Z.busy;
+  }
+}
+/* adds the parts in idx (in order); part 1 gets the newest time so the parts are listed in reading order */
+function addParts(idx) {
+  if (Z.busy) return Promise.resolve(false);
+  Z.busy = true; partButtons();
+  var parts = Z.parts, meta = Z.meta, added = Z.added, seq = Z.seq, n = parts.length, now = Date.now();
+  /* parts added before keep their place: the new ones are timed to fit around them */
+  added.some(function (t, j) { if (t && !t.sample) { now = t.created - (n - j); return true; } return false; });
+  return idx.reduce(function (p, i) {
+    return p.then(function () {
+      if (added[i]) return;
+      var t = { title: partTitle(i), by: meta.by.slice(0, 60), text: parts[i].text, created: now + (n - i), seen: [], n: 0, av: 0 };
+      return createText(t).then(function () { S.texts.unshift(t); added[i] = t; });
+    });
+  }, Promise.resolve()).then(function () { return true; }, function (err) {
+    toast('Could not save it (' + ((err && err.code) || (err && err.message) || 'unknown') + '). The browser’s storage may be full: delete some texts and try again.');
+    return false;
+  }).then(function (ok) {
+    S.texts.sort(function (a, b) { return b.created - a.created; });
+    if (S.mode !== 'db') saveLocal();
+    Z.busy = false;
+    if (seq === Z.seq) partButtons();
+    return ok;
+  });
+}
+function pickAozoraFile() { $('aoz-file').value = ''; $('aoz-file').click(); }
+function readAozoraFile(file) {
+  if (file.size > 20 * 1024 * 1024) { toast('That file is too big to be an Aozora Bunko text.'); return; }
+  file.arrayBuffer().then(function (b) { return AZ.bytesToText(new Uint8Array(b)); }).then(function (raw) {
+    if (!/[぀-ヿ㐀-鿿]/.test(raw)) throw new Error('it holds no Japanese text');
+    var head = AZ.parseText(raw.split(/\r?\n\s*\r?\n/)[0] + '\n\n');
+    openWork(null, { title: head.title || file.name.replace(/\.(zip|txt)$/i, ''), author: head.author, raw: raw });
+  }).catch(function (err) {
+    toast('That file could not be read (' + ((err && err.message) || 'unknown error') + ').');
+  });
+}
+
+/* ---------- reader ---------- */
+function openReader(t, an) {
+  S.cur = t; S.chunks = []; S.held = -1;
+  if (t.sample) t.seen = LS.get('yomu.sample.seen', []);
+  if (!t.seen) t.seen = [];
+  $('read-title').textContent = t.title;
+  var box = $('passage');
+  box.textContent = '';
+  show('read');
+  $('read-scroll').scrollTop = 0;
+  updateCount();
+  var got = an ? Promise.resolve(an) : t.sample ? Promise.resolve(SAMPLE_AN) : AN.get(t.id);
+  got.then(function (a) {
+    if (a && a.v === AV) return a;
+    var wait = el('div', 'wait');
+    var msg = el('div', null, 'Preparing this text. The dictionary is loaded the first time and then kept on this device.');
+    var track = el('div', 'track'), bar = el('i');
+    track.appendChild(bar); wait.appendChild(msg); wait.appendChild(track);
+    box.appendChild(wait);
+    ENG.onProgress = function (d, tt) { bar.style.width = Math.round(d / tt * 100) + '%'; msg.textContent = progressText(d, tt); };
+    return ENG.analyze(t.text).then(function (fresh) {
+      AN.put(t.id, fresh);
+      if (t.av !== fresh.v) {
+        /* the looked-up list points at phrases by position, so it is kept only if the phrases did not move */
+        if (t.n && countPhrases(fresh) !== t.n && t.seen.length) {
+          t.seen = [];
+          toast('The readings for this text were improved, and its phrases changed, so its looked-up list starts over.');
+        }
+        t.av = fresh.v;
+      }
+      t.n = countPhrases(fresh);
+      persistSeen(t);
+      return fresh;
+    });
+  }).then(function (a) {
+    if (S.cur !== t) return;
+    renderPassage(a);
+  }).catch(function (err) {
+    if (S.cur !== t) return;
+    box.textContent = '';
+    var p = el('div', 'problem', 'This text could not be prepared (' + ((err && err.message) || 'unknown error') + '). Check your connection, go back and open it again.');
+    p.style.fontFamily = 'var(--ui)';
+    box.appendChild(p);
+  });
+}
+function rubyInto(node, segs) {
+  segs.forEach(function (s) {
+    if (s[1]) {
+      var r = el('span', 'rb'); r.appendChild(document.createTextNode(s[0]));
+      r.appendChild(el('span', 'rt', s[1]));
+      node.appendChild(r);
+    } else node.appendChild(document.createTextNode(s[0]));
+  });
+}
+function renderPassage(an) {
+  var box = $('passage'), frag = document.createDocumentFragment();
+  var seen = {};
+  S.cur.seen.forEach(function (i) { seen[i] = 1; });
+  S.chunks = [];
+  an.paras.forEach(function (para) {
+    var p = el('p');
+    if (!para.length) { p.className = 'gap'; frag.appendChild(p); return; }
+    para.forEach(function (c) {
+      if (!c.w) { p.appendChild(document.createTextNode(c.x || '')); return; }
+      var i = S.chunks.length;
+      S.chunks.push(c);
+      var u = el('span', 'u');
+      if (c.h) u.appendChild(document.createTextNode(c.h));
+      var b = el('button', seen[i] ? 'ph seen' : 'ph');
+      b.type = 'button'; b.setAttribute('data-i', i);
+      c.w.forEach(function (w) { rubyInto(b, w.s); });
+      u.appendChild(b);
+      if (c.t) u.appendChild(document.createTextNode(c.t));
+      p.appendChild(u);
+    });
+    frag.appendChild(p);
+  });
+  box.textContent = '';
+  box.appendChild(frag);
+  S.cur.seen = S.cur.seen.filter(function (i) { return i < S.chunks.length; });
+  updateCount();
+}
+function updateCount() {
+  var n = S.cur && S.cur.seen ? S.cur.seen.length : 0;
+  $('read-count').innerHTML = '';
+  $('read-count').appendChild(document.createTextNode(n + ' '));
+  $('read-count').appendChild(el('small', null, '/ ' + num(S.chunks.length)));
+}
+
+/* the reveal */
+function buildLens(c) {
+  var lens = $('lens');
+  lens.textContent = '';
+  var row = el('div', 'lw');
+  c.w.forEach(function (w) {
+    var col = el('div', w.f ? 'lc f' : 'lc');
+    var j = el('div', 'lj'); j.lang = 'ja';
+    rubyInto(j, w.s);
+    col.appendChild(j);
+    col.appendChild(el('div', 'le', w.e || ' '));
+    row.appendChild(col);
+  });
+  lens.appendChild(row);
+  (c.g || []).forEach(function (g) {
+    var line = el('div', 'lg');
+    var tag = el('b', null, '文法'); tag.lang = 'ja';
+    var pat = el('span', null, g[0]); pat.lang = 'ja';
+    line.appendChild(tag); line.appendChild(pat); line.appendChild(el('em', null, g[1]));
+    lens.appendChild(line);
+  });
+}
+function placeLens(b) {
+  var lens = $('lens');
+  lens.style.visibility = 'hidden'; lens.style.top = '0px'; lens.hidden = false;
+  var r = b.getBoundingClientRect(), h = lens.offsetHeight;
+  var floor = $('read-scroll').getBoundingClientRect().top - 44;
+  var top = r.top - h - 10;
+  if (top < Math.max(4, floor)) top = Math.min(r.bottom + 16, window.innerHeight - h - 8);
+  lens.style.top = Math.round(top) + 'px';
+  lens.style.visibility = 'visible';
+}
+function reveal(b) {
+  var i = +b.getAttribute('data-i');
+  if (i === S.held) return;
+  var old = document.querySelector('.ph.on');
+  if (old) old.classList.remove('on');
+  S.held = i;
+  b.classList.add('on');
+  buildLens(S.chunks[i]);
+  placeLens(b);
+  if (S.cur.seen.indexOf(i) < 0) {
+    S.cur.seen.push(i);
+    b.classList.add('seen');
+    updateCount();
+    queueSeen();
+  }
+}
+function release() {
+  var old = document.querySelector('.ph.on');
+  if (old) old.classList.remove('on');
+  S.held = -1;
+  $('lens').hidden = true;
+}
+function phraseAt(x, y) {
+  var n = document.elementFromPoint(x, y);
+  return n && n.closest ? n.closest('.ph') : null;
+}
+(function wireReveal() {
+  var box = $('passage');
+  var touch = null, holding = false, holdTimer = 0, peekTimer = 0, lastTouch = 0, mouseDown = false;
+  box.addEventListener('touchstart', function (e) {
+    lastTouch = Date.now();
+    clearTimeout(peekTimer); clearTimeout(holdTimer);
+    if (e.touches.length > 1) { touch = null; holding = false; release(); return; }
+    var b = e.target.closest ? e.target.closest('.ph') : null;
+    if (!b) { touch = null; release(); return; }
+    var t = e.touches[0];
+    touch = { x: t.clientX, y: t.clientY, el: b, moved: false };
+    /* a short wait, so a swipe still scrolls the text */
+    holdTimer = setTimeout(function () { if (touch) { holding = true; reveal(b); } }, 120);
+  }, { passive: true });
+  box.addEventListener('touchmove', function (e) {
+    if (!touch) return;
+    var t = e.touches[0];
+    if (holding) {
+      if (e.cancelable) e.preventDefault();
+      var b = phraseAt(t.clientX, t.clientY);
+      if (b) reveal(b);
+      return;
+    }
+    if (Math.abs(t.clientX - touch.x) > 8 || Math.abs(t.clientY - touch.y) > 8) { touch.moved = true; clearTimeout(holdTimer); }
+  }, { passive: false });
+  function touchDone(e) {
+    lastTouch = Date.now();
+    clearTimeout(holdTimer);
+    if (holding) { holding = false; release(); if (e.cancelable) e.preventDefault(); }
+    else if (touch && !touch.moved && e.type === 'touchend') {
+      /* a quick tap: show it for a moment */
+      reveal(touch.el);
+      peekTimer = setTimeout(release, 1800);
+    }
+    touch = null;
+  }
+  box.addEventListener('touchend', touchDone);
+  box.addEventListener('touchcancel', touchDone);
+  box.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  box.addEventListener('mousedown', function (e) {
+    if (e.button !== 0 || Date.now() - lastTouch < 900) return;
+    var b = e.target.closest ? e.target.closest('.ph') : null;
+    if (!b) return;
+    e.preventDefault();
+    clearTimeout(peekTimer);
+    mouseDown = true;
+    reveal(b);
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (!mouseDown) return;
+    var b = phraseAt(e.clientX, e.clientY);
+    if (b) reveal(b);
+  });
+  window.addEventListener('mouseup', function () { if (mouseDown) { mouseDown = false; release(); } });
+
+  /* keyboard: Tab to a phrase to show it */
+  box.addEventListener('focusin', function (e) {
+    if (mouseDown || Date.now() - lastTouch < 900) return;
+    var b = e.target.closest ? e.target.closest('.ph') : null;
+    if (b && b.matches(':focus-visible')) reveal(b);
+  });
+  box.addEventListener('focusout', function () { if (!mouseDown && !holding && Date.now() - lastTouch > 900) release(); });
+  $('read-scroll').addEventListener('scroll', function () { if (!holding && !mouseDown && S.held >= 0) { clearTimeout(peekTimer); release(); } }, { passive: true });
+})();
+
+/* ---------- sheets ---------- */
+var openSheet = null, sheetReturn = null;
+function sheet(id) {
+  release();
+  if (openSheet) $(openSheet).hidden = true;
+  sheetReturn = document.activeElement;
+  openSheet = id;
+  $('scrim').hidden = false;
+  $(id).hidden = false;
+  var first = $(id).querySelector('button');
+  if (first) first.focus({ preventScroll: true });
+}
+function closeSheet() {
+  if (!openSheet) return;
+  $(openSheet).hidden = true; $('scrim').hidden = true; openSheet = null;
+  if (sheetReturn && sheetReturn.focus) sheetReturn.focus({ preventScroll: true });
+}
+function renderLooked() {
+  var list = $('looked'), have = {}, n = 0;
+  list.textContent = '';
+  S.cur.seen.slice().reverse().forEach(function (i) {
+    var c = S.chunks[i];
+    if (!c || !c.d || have[c.d[0]]) return;
+    have[c.d[0]] = 1; n++;
+    var li = el('li');
+    var w = el('span', 'w', c.d[0]); w.lang = 'ja';
+    li.appendChild(w);
+    if (c.d[1]) { var r = el('span', 'r', c.d[1]); r.lang = 'ja'; li.appendChild(r); }
+    li.appendChild(el('span', 'g', c.d[2] || 'No dictionary entry found.'));
+    list.appendChild(li);
+  });
+  $('looked-empty').hidden = n > 0;
+  $('clear-list').hidden = S.cur.seen.length === 0;
+}
+
+/* ---------- wiring ---------- */
+$('go-add').addEventListener('click', function () { addProblem(''); show('add'); });
+$('add-back').addEventListener('click', function () { show('lib'); renderLibrary(); });
+$('go-aoz').addEventListener('click', openAozora);
+$('add-to-aoz').addEventListener('click', openAozora);
+$('aoz-back').addEventListener('click', function () {
+  if (!$('aoz-work').hidden) { Z.seq++; aozPanel('find'); return; }
+  show('lib'); renderLibrary();
+});
+$('aoz-form').addEventListener('submit', function (e) { e.preventDefault(); aozSearch(); $('aoz-q').blur(); });
+var aozTimer = 0;
+$('aoz-q').addEventListener('input', function () { clearTimeout(aozTimer); aozTimer = setTimeout(aozSearch, 200); });
+$('aoz-modern').addEventListener('change', aozSearch);
+$('aoz-file-btn').addEventListener('click', pickAozoraFile);
+$('aoz-file').addEventListener('change', function () { var f = this.files && this.files[0]; if (f) readAozoraFile(f); });
+$('read-back').addEventListener('click', function () {
+  clearTimeout(seenTimer);
+  if (S.cur) persistSeen(S.cur);
+  S.cur = null;
+  show('lib'); renderLibrary();
+});
+$('add-form').addEventListener('submit', submitAdd);
+$('add-text').addEventListener('input', addCount);
+$('open-hints-a').addEventListener('click', function () { sheet('sheet-hints'); });
+$('open-hints-b').addEventListener('click', function () { sheet('sheet-hints'); });
+$('open-credits').addEventListener('click', function () { sheet('sheet-credits'); });
+$('export-lib').addEventListener('click', exportLibrary);
+$('import-lib').addEventListener('click', function () { $('import-file').value = ''; $('import-file').click(); });
+$('import-file').addEventListener('change', function () { var f = this.files && this.files[0]; if (f) importLibrary(f); });
+$('open-list').addEventListener('click', function () { renderLooked(); sheet('sheet-list'); });
+$('scrim').addEventListener('click', closeSheet);
+Array.prototype.forEach.call(document.querySelectorAll('[data-close]'), function (b) { b.addEventListener('click', closeSheet); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
+['furi', 'mean', 'gram'].forEach(function (k) {
+  $('sw-' + k).addEventListener('click', function () { setSetting(k, !S.settings[k]); });
+});
+[0, 1, 2].forEach(function (i) { $('size-' + i).addEventListener('click', function () { setSetting('size', i); }); });
+$('face-print').addEventListener('click', function () { setSetting('face', 'print'); });
+$('face-hand').addEventListener('click', function () { setSetting('face', 'hand'); });
+$('clear-list').addEventListener('click', function () {
+  if (!S.cur) return;
+  S.cur.seen = [];
+  Array.prototype.forEach.call(document.querySelectorAll('.ph.seen'), function (b) { b.classList.remove('seen'); });
+  updateCount(); persistSeen(S.cur); renderLooked();
+});
+window.addEventListener('pagehide', function () { if (S.cur) persistSeen(S.cur); });
+
+applySettings();
+renderLibrary();
+initStore();
+
+/* the offline copy (sw.js): on the web only, not inside a Claude artifact; ?nosw leaves it off */
+if ('serviceWorker' in navigator && /^https:|^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(location.href) && !/[?&]nosw\b/.test(location.search) && !(window.claude && window.claude.use)) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+})();
+</script>
+</body>
+</html>

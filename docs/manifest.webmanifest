@@ -1,0 +1,17 @@
+{
+  "name": "Yaoki Reader",
+  "short_name": "Yaoki Reader",
+  "description": "Read Japanese with the furigana hidden. Touch a phrase to see its reading and meaning.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F5F9",
+  "theme_color": "#F4F5F9",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
