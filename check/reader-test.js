@@ -7,6 +7,8 @@ const path = require('path');
 const { chromium } = require('playwright');
 
 const READER = 'http://127.0.0.1:8766/Yaoki-reader/';
+// the analysis version the engine makes now: a backup made by this version keeps its looked-up marks
+const AV = +/var VERSION = (\d+)/.exec(fs.readFileSync(path.join(__dirname, '..', 'docs', 'engine', 'analyzer.js'), 'utf8'))[1];
 const out = path.join(__dirname, 'out');
 fs.mkdirSync(out, { recursive: true });
 let fails = 0;
@@ -108,7 +110,7 @@ async function holdFirstPhrase(page, nth) {
   step('load a backup: one new text, one already here, one empty entry');
   const fixture = await writeBackup([
     saved.texts[0],
-    { title: '短い話', text: '駅の忘れ物センターには、毎日たくさんの傘が届く。', created: saved.texts[0].created + 1000, seen: [0, 2], n: 9, av: 5 },
+    { title: '短い話', text: '駅の忘れ物センターには、毎日たくさんの傘が届く。', created: saved.texts[0].created + 1000, seen: [0, 2], n: 9, av: AV },
     { title: '空', text: '   ' },
   ]);
   await page.setInputFiles('#import-file', fixture);

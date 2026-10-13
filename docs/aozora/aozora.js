@@ -123,22 +123,68 @@ function bytesToText(bytes) {
 var HEAD = /［＃[^］]*?(大|中)見出し(?:終わり)?］/;
 var JISPLACE = /第[34]水準(\d)-(\d{1,2})-(\d{1,2})/;
 function needsTable(raw) { return JISPLACE.test(raw); }
-function cleanLine(s, jis) {
-  return s
-    /* characters Shift_JIS cannot hold, written ※［＃description、第3水準1-85-25］ or ［＃description、U+XXXX、…］.
-       jis is the table in aozora/jisx0213.json; a character found in neither way stays as ※ */
-    .replace(/※［＃[^］]*］/g, function (m) {
-      var u = /U\+([0-9A-Fa-f]{4,6})/.exec(m);
-      if (u) return String.fromCodePoint(parseInt(u[1], 16));
-      var j = JISPLACE.exec(m);
-      return (j && jis && jis[+j[1] + '-' + +j[2] + '-' + +j[3]]) || '※';
-    })
-    .replace(/［＃[^］]*］/g, '')
-    /* ruby: 漢字《かんじ》, ｜一番獰悪《どうあく》 */
-    .replace(/《[^》]*》/g, '').replace(/｜/g, '')
-    /* repeat marks written across two characters */
-    .replace(/／″＼/g, '〴〵').replace(/／＼/g, '〳〵')
-    .replace(/\s+$/, '');
+/* The kind of character a ruby without ｜ attaches to: the run of characters of the same kind before it. */
+function charKind(c) {
+  if (/[㐀-䶿一-鿿豈-﫿々〆〇ヶ仝※]/.test(c) || /[\uD800-\uDBFF]/.test(c)) return 'k';
+  if (/[ァ-ヺー]/.test(c)) return 'K';
+  if (/[ぁ-ゖ]/.test(c)) return 'h';
+  if (/[A-Za-zＡ-Ｚａ-ｚ0-9０-９]/.test(c)) return 'a';
+  return '';
+}
+/* One line of Aozora text to plain text, and its ruby (furigana) as [start, length, reading] in that text.
+   Ruby: 漢字《かんじ》 covers the run of kanji before it; ｜一番獰悪《どうあく》 starts where ｜ is. */
+function convertLine(s, jis) {
+  var out = '', ruby = [], mark = -1, re = /※［＃[^］]*］|［＃[^］]*］|《([^》]*)》|｜|／″＼|／＼|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g, m;
+  while ((m = re.exec(s))) {
+    var t = m[0];
+    if (t.charAt(0) === '※' && t.length > 1) {
+      /* characters Shift_JIS cannot hold, written ※［＃description、第3水準1-85-25］ or ［＃description、U+XXXX、…］.
+         jis is the table in aozora/jisx0213.json; a character found in neither way stays as ※ */
+      var u = /U\+([0-9A-Fa-f]{4,6})/.exec(t), j = JISPLACE.exec(t);
+      out += u ? String.fromCodePoint(parseInt(u[1], 16)) : (j && jis && jis[+j[1] + '-' + +j[2] + '-' + +j[3]]) || '※';
+    } else if (t.charAt(0) === '［') {
+      /* notes (indents, emphasis, headings) leave nothing */
+    } else if (t === '｜') {
+      mark = out.length;
+    } else if (t.charAt(0) === '《') {
+      var start = mark;
+      if (start < 0) {
+        start = out.length;
+        var kind = out ? charKind(out.charAt(out.length - 1)) || charKind(out.slice(-2)) : '';
+        while (kind && start > 0) {
+          var prev = /[\uDC00-\uDFFF]/.test(out.charAt(start - 1)) ? out.slice(start - 2, start) : out.charAt(start - 1);
+          if (charKind(prev) !== kind) break;
+          start -= prev.length;
+        }
+      }
+      var reading = m[1].replace(/[^ぁ-ゖァ-ヺー]/g, '');
+      if (start < out.length && reading) ruby.push([start, out.length - start, reading]);
+      mark = -1;
+    } else if (t === '／″＼') out += '〴〵';
+    else if (t === '／＼') out += '〳〵';
+    else out += t;
+  }
+  var trimmed = out.replace(/\s+$/, '');
+  return { text: trimmed, ruby: ruby.filter(function (r) { return r[0] + r[1] <= trimmed.length; }) };
+}
+function cleanLine(s, jis) { return convertLine(s, jis).text; }
+/* Pasted text in Aozora's notation (漢字《かんじ》): plain text and its ruby */
+function convertText(raw, jis) {
+  var text = '', ruby = [];
+  raw.replace(/\r\n?/g, '\n').split('\n').forEach(function (line, i) {
+    var c = convertLine(line, jis);
+    if (i) text += '\n';
+    c.ruby.forEach(function (r) { ruby.push([r[0] + text.length, r[1], r[2]]); });
+    text += c.text;
+  });
+  return { text: text, ruby: ruby };
+}
+/* ruby kept with a saved text as one string: start,length,reading;… */
+function rubyToString(ruby) { return (ruby || []).map(function (r) { return r[0] + ',' + r[1] + ',' + r[2]; }).join(';'); }
+function rubyFromString(s) {
+  if (!s || typeof s !== 'string') return [];
+  return s.split(';').map(function (x) { var p = x.split(','); return [+p[0], +p[1], p[2] || '']; })
+    .filter(function (r) { return r[0] >= 0 && r[1] > 0 && /^[ぁ-ゖァ-ヺー]+$/.test(r[2]); });
 }
 function parseText(raw, jis) {
   var lines = raw.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
@@ -157,7 +203,7 @@ function parseText(raw, jis) {
   for (; i < end; i++) {
     var src = lines[i];
     if (/［＃本文終わり］/.test(src)) break;
-    var text = cleanLine(src, jis);
+    var conv = convertLine(src, jis), text = conv.text;
     if (!text.trim()) {
       /* a line that only held notes (indents, page breaks) leaves nothing; an empty line stays one */
       if (src.trim() && !/［＃改(?:ページ|丁|段|見開き)］/.test(src)) continue;
@@ -166,7 +212,10 @@ function parseText(raw, jis) {
       continue;
     }
     var h = HEAD.exec(src);
-    out.push(h ? { text: text.trim(), head: true } : { text: text });
+    if (h) {
+      var lead = text.length - text.replace(/^\s+/, '').length;
+      out.push({ text: text.trim(), head: true, ruby: conv.ruby.map(function (r) { return [r[0] - lead, r[1], r[2]]; }).filter(function (r) { return r[0] >= 0; }) });
+    } else out.push({ text: text, ruby: conv.ruby });
   }
   while (out.length && !out[0].text) out.shift();
   while (out.length && !out[out.length - 1].text) out.pop();
@@ -194,21 +243,34 @@ function splitParts(lines, target, max) {
     s.lines.forEach(function (l) {
       if (part && part.len + l.text.length + 1 > target) flush();
       if (l.text.length < target) { addLine(l); return; }
-      /* one paragraph longer than a part: broken after a sentence */
-      var chunk = '';
+      /* one paragraph longer than a part: broken after a sentence; each piece keeps the ruby inside it */
+      var chunk = '', from = 0;
+      function piece() {
+        var to = from + chunk.length;
+        addLine({ text: chunk, ruby: (l.ruby || []).filter(function (r) { return r[0] >= from && r[0] + r[1] <= to; }).map(function (r) { return [r[0] - from, r[1], r[2]]; }) });
+        from = to;
+      }
       (l.text.match(new RegExp('[^。]{1,' + (target - 1) + '}。?|[\\s\\S]{1,' + target + '}', 'g')) || []).forEach(function (t) {
-        if (chunk && chunk.length + t.length > target) { addLine({ text: chunk }); flush(); chunk = ''; }
+        if (chunk && chunk.length + t.length > target) { piece(); flush(); chunk = ''; }
         chunk += t;
       });
-      if (chunk) addLine({ text: chunk });
+      if (chunk) piece();
     });
   });
   flush();
   return parts.map(function (p) {
-    var text = p.lines.map(function (l) { return l.text; }).join('\n').replace(/^\n+|\n+$/g, '');
+    var joined = '', ruby = [];
+    p.lines.forEach(function (l, i) {
+      if (i) joined += '\n';
+      (l.ruby || []).forEach(function (r) { ruby.push([r[0] + joined.length, r[1], r[2]]); });
+      joined += l.text;
+    });
+    var lead = joined.length - joined.replace(/^\n+/, '').length;
+    var text = joined.replace(/^\n+|\n+$/g, '');
+    ruby = ruby.map(function (r) { return [r[0] - lead, r[1], r[2]]; }).filter(function (r) { return r[0] >= 0 && r[0] + r[1] <= text.length; });
     var head = p.lines.filter(function (l) { return l.head; })[0];
     var first = p.lines.filter(function (l) { return l.text.trim() && !l.head; })[0];
-    return { text: text, head: head ? head.text : '', start: first ? first.text.trim().slice(0, 40) : '' };
+    return { text: text, ruby: ruby, head: head ? head.text : '', start: first ? first.text.trim().slice(0, 40) : '' };
   }).filter(function (p) { return p.text.trim(); });
 }
 
@@ -238,7 +300,7 @@ var api = {
   KINDS: KINDS, zipUrl: zipUrl, cardUrl: cardUrl, mirrorUrls: mirrorUrls,
   parseCatalog: parseCatalog, search: search, fold: fold,
   decode: decode, isZip: isZip, unzipText: unzipText, bytesToText: bytesToText,
-  parseText: parseText, needsTable: needsTable, splitParts: splitParts, fetchWork: fetchWork,
+  parseText: parseText, needsTable: needsTable, convertText: convertText, rubyToString: rubyToString, rubyFromString: rubyFromString, splitParts: splitParts, fetchWork: fetchWork,
 };
 root.YomuAozora = api;
 if (typeof module === 'object' && module.exports) module.exports = api;

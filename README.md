@@ -9,7 +9,9 @@ Open it at **https://jorycook.github.io/Yaoki-reader/**. On an iPhone: open the 
 - **Your own texts.** Paste up to 30,000 characters of Japanese. Readings, meanings and grammar notes are worked out in the browser; nothing is sent anywhere.
 - **Aozora Bunko.** **From Aozora Bunko** finds a work out of copyright by title or author (kanji, kana, roman letters, or the address of its Aozora page) and adds it. Modern spelling (新字新仮名) is shown unless that box is cleared, since readings are often wrong for old spelling. A long work is cut into parts at its chapter headings (about 12,000 characters, never over 30,000); each part is a text of its own, such as 吾輩は猫である（1/21）.
 - **Saving.** Texts are kept in the browser they were added in (`localStorage`, keys starting `yomu.`; analyses in IndexedDB `yomu-reader`). **Save a backup** and **Load a backup** carry the library to another device or browser.
-- **Offline.** After the first visit the page opens without a connection. The dictionary (about 36 MB) is downloaded the first time a text is analysed and then kept on the device, so later texts are analysed offline too.
+- **Words the dictionary does not have as written.** Names get their reading in roman letters and "(probably a name)" (犍陀多 → Kandata), katakana names "(foreign name or word)"; sound words are looked up in kana and with と (ドッと, モグモグ); older spellings are understood (ゐる, 思ふ, 帰つて, ストオヴ, 顫える, 気もち); a compound only known in pieces is glossed piece by piece; a kanji no word explains shows its own meaning, from KANJIDIC2. Works from Aozora Bunko keep the author's furigana, which decide readings and names.
+- **Common words written in kana.** Which word a kana spelling stands for (あたり is 辺り, not 当たり) and a gloss of its usual senses (もう "already; (no) more; one more; soon") come, for about 250 common words, from checking the reader's choices against sentences of thirty works; the rest from how JMdict marks words usually written in kana.
+- **Offline.** After the first visit the page opens without a connection. The dictionary (about 40 MB) is downloaded the first time a text is analysed and then kept on the device, so later texts are analysed offline too.
 
 ### Where Aozora texts come from
 
@@ -24,14 +26,16 @@ The site is `docs/`, served by GitHub Pages (Settings → Pages → Deploy from 
 | `docs/index.html` | The whole page: library, add form, Aozora Bunko, reader, settings, backups. |
 | `docs/sw.js` | The offline copy: the page and the engine's scripts fresh from the network when there is one, the dictionary kept on the device. If the dictionary's files are ever replaced, change `ENGINE` in it. |
 | `docs/manifest.webmanifest`, `docs/icons/` | Home-screen name and icons (Yaoki's daruma on the reader's blue, drawn by `tools/icons.mjs`). |
-| `docs/engine/analyzer.js` | Phrases, readings, glosses and grammar notes (analysis version 5). Texts analysed by an earlier version are analysed again when next opened. |
+| `docs/engine/analyzer.js` | Phrases, readings, glosses and grammar notes (analysis version 6). Texts analysed by an earlier version are analysed again when next opened. Besides the tokenizer's words it mends what the tokenizer gets wrong (unknown kanji, old spellings, runs of hiragana), reads Aozora's furigana, and has a chain of fallbacks for words the dictionary lacks. `KANA` and `GLOSS` near the top hold the choices for common words written in kana, checked against real texts. |
 | `docs/engine/kuromoji.js`, `engine/dict/` | kuromoji.js 0.1.2 and the IPA dictionary, its loader changed to read the dictionary as base64 text. |
 | `docs/engine/jm-1.txt`, `jm-2.txt` | A shortened JMdict word list (2020 edition, from the `jamdict-data` 1.5 package). |
+| `docs/engine/jm-3.txt` | The supplement from a newer JMdict: words added since 2020, more spellings of the list's words, how usual it is to write each word in kana. Made by `tools/jm-supplement.py`; after remaking it, change `SUPPLEMENT` in `sw.js`. |
+| `docs/engine/kanji.txt` | English meanings of single kanji from KANJIDIC2, made by `tools/kanji-meanings.py`. |
 | `docs/engine/worker.js`, `boot.js` | Runs the engine off the page's main thread. |
 | `docs/aozora/aozora.js` | Aozora Bunko: searching the catalog, fetching a work, reading a .zip or .txt, taking out Aozora's notation, cutting long works into parts. |
 | `docs/aozora/catalog.txt` | The 17,344 Aozora works out of copyright (titles, authors, file names; no texts), from Aozora's index of 2026-08-20. |
 | `docs/aozora/jisx0213.json` | Characters by their JIS X 0213 place, for the ones Aozora's files describe. |
-| `tools/` | `aozora-catalog.py` (remakes the catalog), `jisx0213-table.py`, `icons.mjs`. |
+| `tools/` | `aozora-catalog.py` (remakes the catalog), `jm-supplement.py`, `kanji-meanings.py`, `jisx0213-table.py`, `icons.mjs`. |
 | `check/` | The tests (Playwright). |
 
 To bring the catalog up to date with Aozora Bunko:
@@ -55,4 +59,4 @@ bash run.sh aozora-test.js    # Aozora Bunko: search, fetch, parts, a downloaded
 
 ## Licences
 
-Listed in `docs/licenses.txt`: Aozora Bunko (the catalog, and where the texts come from), JMdict (EDRDG, CC BY-SA 4.0, and the shortened word list under the same licence), kuromoji.js (Apache-2.0, with the mecab-ipadic notice) and the typefaces loaded from Google Fonts (SIL Open Font License 1.1). Only add texts you are free to keep a copy of; nothing you add goes into this repository.
+Listed in `docs/licenses.txt`: Aozora Bunko (the catalog, and where the texts come from), JMdict and KANJIDIC2 (EDRDG, CC BY-SA 4.0; the shortened word list, its supplement and the kanji meanings under the same licence), kuromoji.js (Apache-2.0, with the mecab-ipadic notice) and the typefaces loaded from Google Fonts (SIL Open Font License 1.1). Only add texts you are free to keep a copy of; nothing you add goes into this repository.

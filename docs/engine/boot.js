@@ -3,7 +3,7 @@
 (function (root) {
 'use strict';
 root.YomuBoot = function (base, onProgress) {
-  var done = 0, total = 15;
+  var done = 0, total = 17;
   function step() { done++; if (onProgress) onProgress(done, total); }
   root.__yomuFile = step;
   var tokenizer = new Promise(function (resolve, reject) {
@@ -17,8 +17,10 @@ root.YomuBoot = function (base, onProgress) {
       return r.text();
     }).then(function (t) { step(); return t.split('\n'); });
   }
-  return Promise.all([tokenizer, lines('jm-1.txt'), lines('jm-2.txt')]).then(function (v) {
-    var engine = root.YomuEngine.create(v[0], v[1].concat(v[2]));
+  /* jm-1 and jm-2: the word list; jm-3: the supplement (newer words, more spellings, kana preferences) */
+  /* kanji.txt: what each kanji means (KANJIDIC), for kanji no word explains */
+  return Promise.all([tokenizer, lines('jm-1.txt'), lines('jm-2.txt'), lines('jm-3.txt'), lines('kanji.txt')]).then(function (v) {
+    var engine = root.YomuEngine.create(v[0], v[1].concat(v[2], v[3]), v[4]);
     step();
     return engine;
   });

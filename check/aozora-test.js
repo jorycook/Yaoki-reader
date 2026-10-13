@@ -19,6 +19,7 @@ const step = (msg) => console.log('-- ' + msg);
 const LEGEND = ['-------------------------------------------------------', '【テキスト中に現れる記号について】', '', '《》：ルビ', '（例）吾輩《わがはい》', '-------------------------------------------------------'];
 const SHORT = ['短い試しの話', '試し作者', '', ...LEGEND, '',
   '　｜昔々《むかしむかし》、山の村に一人の男《おとこ》が住んでいた。',
+  '　男の名は親佐《おやさ》と云った。親佐は毎朝、家《うち》を出た。',
   '　男は※［＃「言＋墟のつくり」、第4水準2-88-74］をつかない人で、※［＃「てへん＋劣」、U+6318、111-7］という字も知っていた。',
   '［＃ここから２字下げ］',
   '　毎朝、川へ水をくみに行き、いろいろ［＃「いろいろ」に傍点］な話を聞いた。',
@@ -111,6 +112,21 @@ async function search(page, q) {
   ok(passage.includes('昔々、山の村') && passage.includes('いろいろな話'), 'ruby and notes are taken out');
   ok(passage.includes('譃') && passage.includes('挘'), 'characters named by JIS place and by U+ code are filled in');
   ok(!passage.includes('底本') && !passage.includes('テキスト中に現れる記号'), 'the notation box and the source notes are left out');
+  // the work's own furigana: a name the dictionary does not have is read as the author wrote it, there and later on
+  const names = await page.evaluate(() => Array.from(document.querySelectorAll('#passage .ph')).filter((b) => /親佐/.test(b.textContent)).map((b) => b.querySelector('.rt') ? b.querySelector('.rt').textContent : ''));
+  ok(names.length === 2 && names.every((r) => r === 'おやさ'), 'a name gets the reading of its furigana, also where it comes again without (' + names.join(', ') + ')');
+  const nameCard = await (async () => {
+    const ph = page.locator('#passage .ph', { hasText: '親佐' }).first();
+    await ph.scrollIntoViewIfNeeded();
+    const b = await ph.boundingBox();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await page.waitForTimeout(250);
+    const t = await page.locator('#lens').innerText(); await page.mouse.up(); return t;
+  })();
+  ok(/Oyasa \(probably a name\)/.test(nameCard), 'its card says it is probably a name: ' + nameCard.replace(/\n/g, ' '));
+  const uchi = await page.evaluate(() => Array.from(document.querySelectorAll('#passage .rb')).filter((r) => r.firstChild.textContent === '家').map((r) => r.querySelector('.rt').textContent));
+  ok(uchi[0] === 'うち', 'the author\'s furigana decides a reading (家 うち)');
+  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('yomu.texts'))[0].ruby || '');
+  ok(/,おやさ/.test(kept), 'the furigana are saved with the text');
   ok(await page.locator('#read-title').innerText() === '蜘蛛の糸', 'reader title is the work\'s title');
   await page.click('#read-back');
   ok(JSON.stringify(await cards(page)) === JSON.stringify(['蜘蛛の糸', '片目のだるま']), 'the work is in the library');
