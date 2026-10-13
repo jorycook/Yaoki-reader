@@ -8,6 +8,15 @@ JMdict is offered under the Creative Commons Attribution-ShareAlike 4.0 licence
 (https://creativecommons.org/licenses/by-sa/4.0/). The files engine/jm-1.txt and
 engine/jm-2.txt are a shortened word list derived from it (built from the
 jamdict-data 1.5 package) and are offered under the same licence.
+engine/jm-3.txt is a supplement derived from JMdict as published in 2026 (words
+added since 2020, further spellings of the list's words, and how usual it is to
+write each word in kana), made by tools/jm-supplement.py, under the same licence.
+
+== KANJIDIC2 (meanings of single kanji) ==
+engine/kanji.txt holds English meanings of kanji taken from KANJIDIC2, the
+property of the Electronic Dictionary Research and Development Group, used in
+conformance with the Group's licence (Creative Commons Attribution-ShareAlike
+4.0), and is offered under the same licence. Made by tools/kanji-meanings.py.
 
 == kuromoji.js 0.1.2 (word splitting and readings) ==
 Copyright Takuya Asano. Apache License 2.0 (full text at the end of this file).
