@@ -143,7 +143,8 @@ function shortGloss(g) {
    A key may end in ':' and a class letter (v verb, n noun, d adverb, a adjective, x other) to apply only then.
    Made from reviewing the reader's choices in thirty works (see check/README or the commit that added them). */
 var KANA = {};
-/* Words whose dictionary gloss starts with a sense they rarely have in a story: the gloss to show instead. */
+/* Words written in kana whose dictionary gloss starts with a sense they rarely have in a story: the gloss to show
+   instead. Keys as in KANA; a key may also end in ':' and the kanji form of the word chosen. */
 var GLOSS = {};
 function kanaPref(key, cls) { return KANA[key + ':' + cls] || KANA[key]; }
 
@@ -203,7 +204,7 @@ Dict.prototype.pick = function (key, cls, reading, inflected, weak) {
     if (r === reading) { rd = r; matched = true; }
     else if (inflected && commonPrefix(r, reading) >= Math.max(1, r.length - 1)) matched = true;
   });
-  var en = shortGloss(best.sense.g), better = kanaKey && (GLOSS[key + ':' + (best.e.k[0] || '')] || GLOSS[key]);
+  var en = shortGloss(best.sense.g), better = kanaKey && (GLOSS[key + ':' + cls] || GLOSS[key + ':' + (best.e.k[0] || '')] || GLOSS[key]);
   if (better) en = better;
   return { en: en, reading: rd, matched: matched, readings: best.e.r, old: best.e.old, rank: best.e.rank, k: best.e.k };
 };
@@ -1332,13 +1333,15 @@ Engine.prototype.paragraph = function (text, spans, names, oldStyle) {
         if (hit && !w.minutes && !w.number && w.merged && !w.preLen && !spanName && spanKnown && !spanRuby && !hit.old && hit.reading && hasKanji(w.key)) {
           var fixed = null;
           if (!endsInflected) {
-            if (hit.readings.indexOf(spanReading) < 0) fixed = remapReading(spanSurface, w.key, hit.reading);
+            /* pieced together from the tokenizer's readings, a rarer reading of the word is a guess: the word's usual
+               (first) reading is shown instead (二人: ふたり, not ににん) */
+            if (hit.readings.indexOf(spanReading) < 0 || (spanReading !== hit.readings[0] && hit.rank >= 2)) fixed = remapReading(spanSurface, w.key, hit.readings[0]);
           } else if (hasKanji(headSurface) && !hit.readings.some(function (r) { return r.indexOf(headReading) === 0; })) {
             /* only the part before the ending is corrected; the ending keeps its own reading (来ない stays こない) */
             var hs = remapHead(headSurface, w.key, hit.reading);
             if (hs) fixed = hs.concat(furi(lastT.surface_form, lastT.reading));
           }
-          if (fixed) segs = withRest(fixed);
+          if (fixed) { segs = withRest(fixed); if (!endsInflected) hit.reading = hit.readings[0]; }
         }
         if (!hit && w.key !== lemma(head)) hit = dict.pick(lemma(head), w.cls, stemReading, true);
         if (!hit && w.cls === 'v') {
@@ -1347,6 +1350,16 @@ Engine.prototype.paragraph = function (text, spans, names, oldStyle) {
             var base = pm[1] + 'うくぐすつぬぶむる'.charAt('えけげせてねべめれ'.indexOf(pm[2]));
             var ph = dict.pick(base, 'v', '', true);
             if (ph) hit = { en: 'can ' + ph.en.replace(/^to /, '').replace(/, to /g, ', '), reading: '' };
+          }
+        }
+        /* a number and its counter (六畳, 二尺, 三匹): the number and what is counted, not just the number */
+        var counter = w.toks.filter(function (t, i) { return i > 0 && t.pos_detail_2 === '助数詞'; })[0];
+        if (counter && head.pos_detail_1 === '数' && (!hit || /^(\d+|one|two|three|four|five|six|seven|eight|nine|ten|hundred|thousand)$/i.test(hit.en))) {
+          var nv = kanjiNumValue(head.surface_form) || numValue(head.surface_form);
+          var ch = dict.pick(counter.surface_form, 'n', hira(counter.reading || ''), false);
+          if (nv && ch) {
+            var what = ch.en.split(', ')[0].replace(/^counter for (?:the )?/, '').replace(/\s*\(.*$/, '');
+            hit = { en: numGloss(nv) + ' ' + what, reading: '' };
           }
         }
         /* ない on its own is "not" or "there is none", never the dictionary's other senses of the kana */
