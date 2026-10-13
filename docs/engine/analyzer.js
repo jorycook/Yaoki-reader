@@ -3,7 +3,7 @@
 (function (root) {
 'use strict';
 
-var VERSION = 5;
+var VERSION = 6;
 var KANJI = /[㐀-䶿一-鿿豈-﫿々〆]/;
 var OPEN = '「『（(〈《【〔［[｛{“‘"\'';
 
@@ -34,24 +34,43 @@ function furi(surface, reading) {
 
 /* ---------- dictionary ---------- */
 
+/* The word list: jm-1.txt and jm-2.txt (JMdict 2020), then the supplement jm-3.txt made from a newer JMdict
+   by tools/jm-supplement.py. The supplement's words are ordinary lines; its other lines refer to a word of the
+   list by its first kanji form (or nothing) and first reading:
+     =spelling TAB kanji TAB reading         one more way to write that word (顫える for 震える)
+     ?kana TAB kanji TAB reading TAB score   how usual it is to write that word in that kana (0 to 20) */
 function Dict(lines) {
   this.lines = lines;
-  var idx = new Map();
+  var idx = new Map(), refs = [], ref = new Map(), kscore = new Map();
   function add(key, i) {
     if (!key) return;
     var v = idx.get(key);
     if (v === undefined) idx.set(key, i);
-    else if (typeof v === 'number') idx.set(key, [v, i]);
-    else v.push(i);
+    else if (typeof v === 'number') { if (v !== i) idx.set(key, [v, i]); }
+    else if (v.indexOf(i) < 0) v.push(i);
   }
   for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
+    var line = lines[i], c0 = line.charAt(0);
+    if (c0 === '=' || c0 === '?') { refs.push(i); continue; }
     var a = line.indexOf('\t'), b = line.indexOf('\t', a + 1);
     if (a < 0 || b < 0) continue;
     if (a > 0) line.slice(0, a).split(';').forEach(function (k) { add(k, i); });
     line.slice(a + 1, b).split(';').forEach(function (k) { add(k, i); });
+    var rk = (a > 0 ? line.slice(0, a).split(';')[0] : '') + '\t' + line.slice(a + 1, b).split(';')[0];
+    if (!ref.has(rk)) ref.set(rk, i);
   }
+  refs.forEach(function (i) {
+    var p = lines[i].split('\t'), target = ref.get(p[1] + '\t' + p[2]);
+    if (target === undefined) return;
+    if (p[0].charAt(0) === '=') add(p[0].slice(1), target);
+    else {
+      var kana = p[0].slice(1), m = kscore.get(kana);
+      if (!m) kscore.set(kana, m = new Map());
+      m.set(target, +p[3] || 0);
+    }
+  });
   this.idx = idx;
+  this.kscore = kscore;
   this.alt = null;
 }
 /* Older and looser writing leaves out the kana between kanji: 絶間 for 絶え間, 取扱 for 取り扱い, 申込 for
@@ -69,13 +88,16 @@ Dict.prototype.alts = function () {
   }
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i], a = line.indexOf('\t');
-    if (a <= 0) continue;
-    var noun = /\tn/.test(line) || /\|n/.test(line);
+    if (a <= 0 || line.charAt(0) === '=' || line.charAt(0) === '?') continue;
+    var noun = /\t[0-9][uo]*\tn/.test(line), verbal = /\t[0-9][uo]*\t[va]/.test(line);
     line.slice(0, a).split(';').forEach(function (k) {
       var inner = k.replace(INNER_KANA, '$1');
       if (inner !== k) add(inner, i);
-      /* a noun also loses the kana at its end (取扱い → 取扱), only once the inner kana are gone */
-      if (noun && inner !== k && END_KANA.test(inner)) add(inner.replace(END_KANA, '$1'), i);
+      /* a verb or adjective written with less okurigana: 寝過ごす → 寝過す, 少ない → 少い, 羨ましい → 羨しい */
+      var short = /^(.*[㐀-䶿一-鿿々])([ぁ-ゖ])([ぁ-ゖ]+)$/.exec(k);
+      if (verbal && short && short[3].length >= 1 && !/^[いうくぐすつぬぶむる]$/.test(short[2] + short[3]) && short[2] !== 'っ') add(short[1] + short[3], i);
+      /* a noun also loses the kana at its end (取扱い → 取扱, 借金取り → 借金取) */
+      if (noun && END_KANA.test(inner)) add(inner.replace(END_KANA, '$1'), i);
     });
   }
   return (this.alt = alt);
@@ -95,7 +117,7 @@ Dict.prototype.entries = function (key) {
       r: p[1].split(';'),
       rank: +flags.charAt(0) || 0,
       uk: flags.indexOf('u') >= 0,
-      old: flags.indexOf('o') >= 0, alt: alt,
+      old: flags.indexOf('o') >= 0, alt: alt, i: i,
       senses: (p[3] || '').split('|').map(function (s) { return { c: s.charAt(0), g: s.slice(1) }; }),
     };
   });
@@ -112,6 +134,10 @@ function shortGloss(g) {
   if (out.length > 46) out = out.slice(0, 45).replace(/\s+\S*$/, '') + '…';
   return out;
 }
+/* Words written in kana that mean one word far more often than the others it could be, in the texts of
+   Aozora Bunko: the kanji form of the word meant. Made from reviewing the reader's choices in thirty works. */
+var KANA = {};
+
 /* Pick the best entry for a key, given what the tokenizer says about the word. */
 Dict.prototype.pick = function (key, cls, reading, inflected, weak) {
   var list = this.entries(key);
@@ -123,12 +149,22 @@ Dict.prototype.pick = function (key, cls, reading, inflected, weak) {
   }
   if (!list.length) return null;
   var kanaKey = !hasKanji(key);
+  /* for a word written in kana, how usual that is for each candidate (the supplement's scores) */
+  var ks = kanaKey ? this.kscore.get(key) : null;
   var best = null, bestScore = -1e9;
   list.forEach(function (e, n) {
     var score = e.rank * 2 - n * 0.01;
     if (e.old) score -= 4;
     if (kanaKey) {
+      /* in kana, a common word always comes before a rare one (時 before 鴇 for とき) */
+      score += e.rank;
       if (!e.k.length) score += 5; else if (e.uk) score += 4; else score -= 3;
+      /* how likely the word is meant by this kana (the supplement): decides between words the list marks alike,
+         such as 成る and 生る for なる, 中 and 仲 for なか */
+      if (ks && ks.has(e.i)) score += ks.get(e.i) * 0.3;
+      /* the words a learner meets in kana most, checked by hand against real texts (KANA below) */
+      var pref = KANA[key];
+      if (pref && e.k.indexOf(pref) >= 0) score += 30;
       if (e.r[0] === key) score += 1;
     } else {
       if (e.k[0] === key) score += 1;
@@ -155,7 +191,7 @@ Dict.prototype.pick = function (key, cls, reading, inflected, weak) {
     if (r === reading) { rd = r; matched = true; }
     else if (inflected && commonPrefix(r, reading) >= Math.max(1, r.length - 1)) matched = true;
   });
-  return { en: shortGloss(best.sense.g), reading: rd, matched: matched, readings: best.e.r, old: best.e.old };
+  return { en: shortGloss(best.sense.g), reading: rd, matched: matched, readings: best.e.r, old: best.e.old, rank: best.e.rank, k: best.e.k };
 };
 
 /* ---------- numbers ---------- */
@@ -387,12 +423,14 @@ function matchOne(m, t) {
   if (m.s && m.s.indexOf(t.surface_form) < 0) return false;
   return true;
 }
-function grammarAt(toks, from, to) {
+/* inside: token ranges [from, to) that are one dictionary word (思ひ + 出す); no pattern is found within them */
+function grammarAt(toks, from, to, inside) {
   var found = [];
   for (var s = from; s < to; s++) {
     for (var p = 0; p < PATTERNS.length; p++) {
       var seq = PATTERNS[p].seq, ok = s + seq.length <= toks.length;
       for (var j = 0; ok && j < seq.length; j++) ok = matchOne(seq[j], toks[s + j]);
+      if (ok && inside && inside.some(function (r) { return s >= r[0] && s + seq.length <= r[1]; })) ok = false;
       if (ok) found.push({ name: PATTERNS[p].name, en: PATTERNS[p].en, s: s, e: s + seq.length });
     }
   }
@@ -412,6 +450,520 @@ function grammarAt(toks, from, to) {
   return out;
 }
 
+/* ---------- words the dictionary does not have as written ---------- */
+
+/* Hepburn romanisation, so a name the dictionary does not have can at least be read: かんだた → Kandata */
+var ROMA = {};
+('あa いi うu えe おo かka きki くku けke こko さsa しshi すsu せse そso たta ちchi つtsu てte とto なna にni ぬnu ねne のno ' +
+ 'はha ひhi ふfu へhe ほho まma みmi むmu めme もmo やya ゆyu よyo らra りri るru れre ろro わwa ゐi ゑe をo んn ' +
+ 'がga ぎgi ぐgu げge ごgo ざza じji ずzu ぜze ぞzo だda ぢji づzu でde どdo ばba びbi ぶbu べbe ぼbo ぱpa ぴpi ぷpu ぺpe ぽpo ' +
+ 'ぁa ぃi ぅu ぇe ぉo ゃya ゅyu ょyo ゎwa ゔvu').split(' ').forEach(function (p) { ROMA[p.charAt(0)] = p.slice(1); });
+var MACRON = { a: 'ā', i: 'ī', u: 'ū', e: 'ē', o: 'ō' };
+function romaji(kana) {
+  var s = hira(kana || ''), out = '';
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charAt(i), n = s.charAt(i + 1);
+    if (c === 'っ') { var nx = ROMA[n] || ''; out += nx ? (nx.charAt(0) === 'c' ? 't' : nx.charAt(0)) : ''; continue; }
+    if (c === 'ー') { var lv = out.charAt(out.length - 1); if (MACRON[lv]) out = out.slice(0, -1) + MACRON[lv]; continue; }
+    if (c === '・' || c === '･' || c === ' ') { out += ' '; continue; }
+    var r = ROMA[c];
+    if (r === undefined) { out += c; continue; }
+    /* ん before a vowel or y: Shin'ichi, Kin'iro */
+    if (c === 'ん') { out += /^[aiueoy]/.test(ROMA[n] || '') ? "n'" : 'n'; continue; }
+    if (n && 'ゃゅょ'.indexOf(n) >= 0 && /i$/.test(r) && r.length > 1) {
+      var stem = r.slice(0, -1);
+      out += (/(sh|ch|j)$/.test(stem) ? stem : stem + 'y') + ROMA[n].slice(1);
+      i++; continue;
+    }
+    if (n && 'ぁぃぅぇぉ'.indexOf(n) >= 0 && r.length > 1 && 'ゃゅょ'.indexOf(c) < 0) {
+      out += r.replace(/[aiueo]$/, '').replace(/^w$/, 'w') + ROMA[n];
+      i++; continue;
+    }
+    out += r;
+  }
+  /* long o and u as in names: Zōshigaya, Kantarō, Yūki */
+  out = out.replace(/o[ou]/g, 'ō').replace(/uu/g, 'ū');
+  return out.split(' ').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ').trim();
+}
+function kata(s) { return s ? s.replace(/[ぁ-ゖ]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) + 0x60); }) : ''; }
+function isKana(s) { return /^[ぁ-ゖァ-ヺーゝゞヽヾ]+$/.test(s); }
+function isKata(s) { return /^[ァ-ヺー・･]+$/.test(s) && /[ァ-ヺ]/.test(s); }
+function allKanji(s) { return /^[㐀-䶿一-鿿豈-﫿々〆〇ヶ]+$/.test(s); }
+function uniq(a) { var seen = {}; return a.filter(function (x) { if (!x || seen[x]) return false; seen[x] = 1; return true; }); }
+
+/* Older spelling, as Aozora Bunko keeps it for many works: ゐ ゑ, ふ ひ へ in verb endings, a full-size つ for っ,
+   やう for よう. Each variant is only tried when the word as written is not found. */
+var OLD_O = { か: 'こ', が: 'ご', さ: 'そ', ざ: 'ぞ', た: 'と', だ: 'ど', な: 'の', ま: 'も', や: 'よ', ら: 'ろ' };
+function oldVariants(s) {
+  var v = [];
+  var a = s.replace(/ゐ/g, 'い').replace(/ゑ/g, 'え').replace(/ヰ/g, 'イ').replace(/ヱ/g, 'エ');
+  v.push(a);
+  var b = a.replace(/ふ$/, 'う').replace(/へる$/, 'える').replace(/ひる$/, 'いる').replace(/はる$/, 'わる');
+  v.push(b);
+  v.push(b.replace(/つ(?=[かきくけこさしすせそたちつてとぱぴぷぺぽ])/g, 'っ'));
+  v.push(b.replace(/([かがさざただなまやら])う/g, function (m, c) { return OLD_O[c] + 'う'; })
+    .replace(/せう/g, 'しょう').replace(/てふ/g, 'ちょう').replace(/けう/g, 'きょう').replace(/しやう/g, 'しょう'));
+  v.push(b.replace(/ぢ/g, 'じ').replace(/づ/g, 'ず'));
+  /* ハ行 kana right after a kanji are an old okurigana: 思ひ出す → 思い出す, 考へ → 考え, 違ひ → 違い */
+  var kh = b.replace(new RegExp('(' + KANJI.source + ')([はひふへほ])', 'g'), function (m, k, c) { return k + 'わいうえお'.charAt('はひふへほ'.indexOf(c)); });
+  v.push(kh);
+  v.push(kh.replace(/つ(?=[かきくけこさしすせそたちつてとぱぴぷぺぽ])/g, 'っ'));
+  return uniq(v).filter(function (x) { return x !== s; });
+}
+/* Older ways of writing loanwords: ストオヴ (ストーブ), シャッタア (シャッター), ポッケット (ポケット) */
+var VOWEL = {};
+'アァカガサザタダナハバパマヤャラワ:a イィキギシジチヂニヒビピミリヰ:i ウゥクグスズツヅヌフブプムユュルヴ:u エェケゲセゼテデネヘベペメレヱ:e オォコゴソゾトドノホボポモヨョロヲ:o'
+  .split(' ').forEach(function (g) { var p = g.split(':'); Array.from(p[0]).forEach(function (c) { VOWEL[c] = p[1]; }); });
+var LONG = { ア: 'a', イ: 'i', ウ: 'u', エ: 'e', オ: 'o' };
+function loanVariants(s) {
+  var v = [];
+  /* a vowel written out after a kana with the same vowel is a long vowel: タア → ター, トオ → トー, ゴウ → ゴー */
+  var a = '';
+  Array.from(s).forEach(function (c, i, arr) {
+    var prev = a.charAt(a.length - 1);
+    if (i > 0 && LONG[c] && (VOWEL[prev] === LONG[c] || (c === 'ウ' && VOWEL[prev] === 'o')) && prev !== 'ー') a += 'ー'; else a += c;
+  });
+  v.push(a);
+  var b = a.replace(/ヴァ/g, 'バ').replace(/ヴィ/g, 'ビ').replace(/ヴェ/g, 'ベ').replace(/ヴォ/g, 'ボ').replace(/ヴ/g, 'ブ')
+    .replace(/ヂ/g, 'ジ').replace(/ヅ/g, 'ズ').replace(/ヰ/g, 'ウィ').replace(/ヱ/g, 'ウェ');
+  v.push(b);
+  [s, a, b].forEach(function (x) { var i = x.indexOf('ッ'); while (i > 0) { v.push(x.slice(0, i) + x.slice(i + 1)); i = x.indexOf('ッ', i + 1); } });
+  v.push(b.replace(/ー$/, ''));
+  return uniq(v).filter(function (x) { return x !== s; });
+}
+var LAUGH = /^[あうえおアウエオ]?([はひふへほハヒフヘホ])\1+[っッーぁァ]*$|^(?:わっはっは|ワッハッハ|あはは|アハハ|ははは|ハハハ|げらげら)$/;
+/* reduplicated (ゴロゴロ), ending in っ (ドッ), or drawn out (ザアー, ビュウ): a word for a sound or a manner */
+function soundLike(s) {
+  var h = hira(s);
+  if (!isKana(h)) return false;
+  return /[っ]$/.test(h) || /^(.{2,3})\1+$/.test(h) || /^(.)ー*\1/.test(h) || /^.[ゃゅょ]?(?:っ|ん)?り$/.test(h.replace(/と$/, '')) ||
+    /(.)(ー|あ|う)ー*$/.test(h) && h.length <= 4;
+}
+
+/* Base forms a written form may come from: 顫えて → 顫える, 逢って → 逢う, 入ろう → 入る, 恐ろしく → 恐ろしい.
+   Every cut of the word is a stem plus an ending; the stem is turned back into each possible dictionary form.
+   The dictionary decides which of them exist; longer stems come first. */
+var GODAN = { か: 'く', き: 'く', け: 'く', こ: 'く', が: 'ぐ', ぎ: 'ぐ', げ: 'ぐ', ご: 'ぐ', さ: 'す', し: 'す', せ: 'す', そ: 'す',
+  た: 'つ', ち: 'つ', て: 'つ', と: 'つ', な: 'ぬ', に: 'ぬ', ね: 'ぬ', の: 'ぬ', ば: 'ぶ', び: 'ぶ', べ: 'ぶ', ぼ: 'ぶ',
+  ま: 'む', み: 'む', め: 'む', も: 'む', ら: 'る', り: 'る', れ: 'る', ろ: 'る', わ: 'う', い: 'う', え: 'う', お: 'う' };
+function baseForms(s) {
+  var out = [{ b: s, stem: s.length, cls: '' }];
+  for (var cut = s.length; cut >= 1; cut--) {
+    var p = s.slice(0, cut), t = s.slice(cut), last = p.charAt(p.length - 1), q = p.slice(0, -1);
+    if (t && !/^[ぁ-ゖ]+$/.test(t)) continue;
+    out.push({ b: p + 'る', stem: cut, cls: 'v' });
+    if (GODAN[last]) out.push({ b: q + GODAN[last], stem: cut, cls: 'v' });
+    if (last === 'っ' && q) ['う', 'つ', 'る', 'く'].forEach(function (e) { out.push({ b: q + e, stem: cut, cls: 'v' }); });
+    if (last === 'ん' && q) ['ぬ', 'ぶ', 'む'].forEach(function (e) { out.push({ b: q + e, stem: cut, cls: 'v' }); });
+    if (last === 'い' && q && /^[てただで]/.test(t)) ['く', 'ぐ'].forEach(function (e) { out.push({ b: q + e, stem: cut, cls: 'v' }); });
+    if (/^(く|か|け|さ|そ|すぎ|げ)/.test(t)) out.push({ b: p + 'い', stem: cut, cls: 'a' });
+    if (KANJI.test(last) && /^[てたっ]/.test(t)) ['く', 'う', 'る', 'つ', 'む', 'す'].forEach(function (e) { out.push({ b: p + e, stem: cut, cls: 'v' }); });
+    if (/^[しさせ]/.test(t)) out.push({ b: p + 'する', stem: cut, cls: 'v' });
+  }
+  return out;
+}
+
+/* what may follow a stem in an inflected form (the rest of a written form after its stem) */
+var INFLECTION = /^(|て|で|た|だ|ちゃ|じゃ|たら|だら|たり|だり|ない|なかっ?た?|なく|ます|まし|ませ|ましょう|れ|られ|せ|させ|う|よう|ば|ず|ぬ|ん|い|く|かっ?た?|けれ|さ|そう|すぎ)(て|た|ば|る|ん|う)?(て|た)?$/;
+
+/* ---------- tokens the tokenizer got wrong ---------- */
+
+function synth(parts, o) {
+  var surface = parts.map(function (t) { return t.surface_form; }).join('');
+  return {
+    surface_form: surface, pos: o.pos || '名詞', pos_detail_1: o.d1 || '一般', pos_detail_2: o.d2 || '*', pos_detail_3: '*',
+    conjugated_type: o.ctype || '*', conjugated_form: o.cform || '*', basic_form: o.basic || surface,
+    reading: o.reading || '', pronunciation: '', word_type: o.type || 'SYNTH', synth: true, name: !!o.name,
+  };
+}
+/* the reading of a written form whose base form the dictionary reads as baseReading: 顫えて from 顫える ふるえる */
+function formReading(surface, base, baseReading) {
+  var i = 0;
+  while (i < surface.length && i < base.length && surface.charAt(i) === base.charAt(i)) i++;
+  var kanaTail = base.slice(i);
+  var r = hira(baseReading || '');
+  if (!r || !kanaTail || r.slice(-kanaTail.length) !== kanaTail) {
+    if (!kanaTail && r) return r + hira(surface.slice(i));
+    return '';
+  }
+  return kata(r.slice(0, r.length - kanaTail.length) + hira(surface.slice(i)));
+}
+
+/* Applies Aozora Bunko's furigana (spans of [start, length, reading] in this paragraph), joins names and words the
+   tokenizer broke into pieces, and joins a sound word with its と. names: base → reading for the whole text. */
+Engine.prototype.repair = function (toks, spans, names) {
+  var dict = this.dict, self = this;
+  function starts() { var p = [], o = 0; toks.forEach(function (t) { p.push(o); o += t.surface_form.length; }); p.push(o); return p; }
+  var at = starts();
+  function replace(a, b, t) { toks.splice(a, b - a, t); at = starts(); }
+  function known(s) { return dict.has(s) || dict.has(hira(s)); }
+
+  /* 0. a run of kana the tokenizer could not place: it takes the whole run as one unknown word
+        (わ + ざとじぶんの, ぐうぐうねむってしまいました). Known words are taken off its front one by one and the rest is
+        tokenized again; the kana before it may belong to it (のに + ぎやかな → の + にぎやかな), and after a kanji the
+        start of the run may be the rest of a word written half in kana (口 + びるを → 唇 + を). */
+  function unknownLen(list) { return list.reduce(function (n, x) { return n + (x.word_type === 'UNKNOWN' ? x.surface_form.length : 0); }, 0); }
+  /* Kana the tokenizer could not place, split again into the cheapest run of dictionary words, inflected forms of
+     them, and particles (ぐうぐうねむってしまいました → ぐうぐう ねむって しまいました). */
+  var oneTok = {};
+  function single(p) {
+    if (!(p in oneTok)) { var tt = self.tokenizer.tokenize(p); oneTok[p] = tt.length === 1 && tt[0].word_type !== 'UNKNOWN' ? tt[0] : null; }
+    return oneTok[p];
+  }
+  function classPos(c) { return c === 'd' ? '副詞' : c === 'a' ? '形容詞' : c === 'v' ? '動詞' : '名詞'; }
+  function peel(str) {
+    var n = str.length, best = [{ cost: 0, parts: [] }];
+    for (var i = 0; i < n; i++) {
+      if (!best[i]) continue;
+      for (var len = 1; len <= Math.min(10, n - i); len++) {
+        var p = str.slice(i, i + len), cost = null, kind = null, base = null;
+        var one = single(p);
+        if (len >= 2 && dict.has(p)) {
+          var pe = dict.entries(p)[0];
+          cost = 1 - pe.rank * 0.1 - Math.min(len, 6) * 0.05; kind = 'word';
+        }
+        if (cost === null && len >= 2) {
+          var bf = len <= 9 && baseForms(p).filter(function (c) {
+            return c.b !== p && c.stem >= 2 && INFLECTION.test(p.slice(c.stem)) && dict.has(c.b) && (c.cls === 'v' || c.cls === 'a');
+          })[0];
+          if (bf) { cost = 1.1 - len * 0.05; kind = 'form'; base = bf; }
+        }
+        if (cost === null && one && (one.pos === '助詞' || one.pos === '助動詞')) { cost = len >= 2 ? 0.9 : 1.05; kind = 'tok'; }
+        if (cost === null && len === 1) { cost = 3; kind = 'char'; }
+        if (cost === null) continue;
+        var total = best[i].cost + cost;
+        if (!best[i + len] || total < best[i + len].cost) best[i + len] = { cost: total, parts: best[i].parts.concat([{ p: p, kind: kind, base: base, one: one }]) };
+      }
+    }
+    var out = [];
+    out.cost = best[n].cost;
+    best[n].parts.forEach(function (x) {
+      if (x.one && x.kind !== 'form') { out.push(x.one); return; }
+      if (x.kind === 'word') {
+        var c0 = (dict.entries(x.p)[0].senses[0] || {}).c;
+        out.push(synth([{ surface_form: x.p }], { pos: classPos(c0), d1: c0 === 'v' || c0 === 'a' ? '自立' : '一般', basic: x.p, reading: kata(x.p), type: 'JOINED' }));
+      } else if (x.kind === 'form') {
+        out.push(synth([{ surface_form: x.p }], { pos: x.base.cls === 'a' ? '形容詞' : '動詞', d1: '自立', basic: x.base.b, reading: kata(x.p), type: 'JOINED' }));
+      } else self.tokenizer.tokenize(x.p).forEach(function (t) { out.push(t); });
+    });
+    return out;
+  }
+  for (var z = 0; z < toks.length; z++) {
+    var zt = toks[z], zs = zt.surface_form;
+    if (zt.word_type !== 'UNKNOWN' || !/^[ぁ-ゖー]{2,}$/.test(zs)) continue;
+    var pv0 = toks[z - 1], options = [];
+    if (pv0 && allKanji(pv0.surface_form) && pv0.reading && pv0.reading !== '*') {
+      for (var kk = zs.length; kk >= 1; kk--) {
+        var whole0 = hira(pv0.reading) + zs.slice(0, kk);
+        var es0 = dict.entries(whole0).filter(function (e) { return e.k.length && e.rank >= 2 && !e.alt; });
+        if (es0.length === 1) {
+          var joined = synth([pv0, { surface_form: zs.slice(0, kk) }], { basic: es0[0].k[0], reading: kata(whole0), type: 'JOINED' });
+          var restList = kk < zs.length ? peel(zs.slice(kk)) : [];
+          options.push({ from: z - 1, list: [joined].concat(restList), cost: 0.4 + (restList.cost || 0) });
+          break;
+        }
+      }
+    }
+    var prevKana = pv0 && /^[ぁ-ゖ]+$/.test(pv0.surface_form) && !pv0.synth;
+    var alone = peel(zs);
+    /* the kana before, kept as it is, counts as one more piece */
+    options.push({ from: z, list: alone, cost: alone.cost + (prevKana ? 1.05 : 0) });
+    if (prevKana) {
+      for (var c = 0; c < pv0.surface_form.length; c++) {
+        var keep = pv0.surface_form.slice(0, c), give = pv0.surface_form.slice(c), pl = peel(give + zs);
+        options.push({ from: z - 1, list: (keep ? self.tokenizer.tokenize(keep) : []).concat(pl), cost: pl.cost + (keep ? 1.05 : 0) });
+      }
+    }
+    /* a run starting with a small kana (ゃいって…) cannot start a word: the two tokens before it go back in too */
+    var pv1 = toks[z - 2];
+    if (prevKana && /^[ゃゅょっぁぃぅぇぉ]/.test(zs) && pv1 && /^[ぁ-ゖ]+$/.test(pv1.surface_form) && !pv1.synth) {
+      var pl2 = peel(pv1.surface_form + pv0.surface_form + zs);
+      options.push({ from: z - 2, list: pl2, cost: pl2.cost - 1.05 });
+    }
+    var bestOpt = null;
+    options.forEach(function (o) {
+      o.score = unknownLen(o.list) * 10 + (o.cost === undefined ? o.list.length : o.cost);
+      if (!bestOpt || o.score < bestOpt.score) bestOpt = o;
+    });
+    if (bestOpt && unknownLen(bestOpt.list) < zs.length) {
+      toks.splice.apply(toks, [bestOpt.from, z + 1 - bestOpt.from].concat(bestOpt.list));
+      /* what is still unknown in the new tokens is looked at again */
+      z = bestOpt.from - 1;
+    }
+  }
+  at = starts();
+
+  /* 1. the author's furigana */
+  (spans || []).forEach(function (sp) {
+    var s = sp[0], e = sp[0] + sp[1], reading = kata(sp[2]);
+    var a = at.indexOf(s), b = at.indexOf(e);
+    if (a >= 0 && b > a) {
+      var group = toks.slice(a, b), surface = group.map(function (t) { return t.surface_form; }).join('');
+      if (b - a === 1) {
+        if (hasKanji(surface) && (!sp[3] || group[0].word_type === 'UNKNOWN')) { group[0].reading = reading; group[0].ruby = true; }
+        return;
+      }
+      var odd = group.some(function (t) { return t.word_type === 'UNKNOWN' || !t.reading || t.reading === '*'; }) ||
+        group.every(function (t) { return t.surface_form.length === 1 && allKanji(t.surface_form); });
+      if ((known(surface) && !sp[3]) || odd) {
+        /* not in the dictionary as written, but its reading is a word written with these kanji: a rarer spelling
+           of that word (獣物《けだもの》 is 獣), not a name */
+        var kj = Array.from(surface).filter(function (c) { return KANJI.test(c); });
+        var same = known(surface) ? null : dict.entries(hira(reading)).filter(function (e) {
+          return e.rank >= 2 && e.k.some(function (k) { return kj.some(function (c) { return k.indexOf(c) >= 0; }); });
+        })[0];
+        var asWord = known(surface) || same;
+        replace(a, b, synth(group, { reading: reading, d1: asWord ? '一般' : '固有名詞', name: !asWord, basic: same ? same.k[0] : surface, type: 'RUBY' }));
+        toks[a].ruby = true;
+      }
+      return;
+    }
+    /* furigana on part of one word (顫《ふる》える read as one token): the token's reading, where every kanji is covered */
+    if (sp[3]) return;
+    for (var i = 0; i < toks.length; i++) {
+      if (at[i] <= s && at[i + 1] >= e && (at[i] < s || at[i + 1] > e)) {
+        var t = toks[i], sf = t.surface_form, off = s - at[i], before = sf.slice(0, off), after = sf.slice(off + sp[1]);
+        if (!hasKanji(before) && !hasKanji(after)) { t.reading = kata(before) + reading + kata(after); t.ruby = true; }
+        break;
+      }
+    }
+  });
+
+  /* 2. kanji the tokenizer did not know, with the single kanji next to them: one name or word (犍 陀 多 → 犍陀多) */
+  for (var i = 0; i < toks.length; i++) {
+    var t = toks[i];
+    if (!(t.word_type === 'UNKNOWN' && allKanji(t.surface_form))) continue;
+    var a = i, b = i + 1;
+    while (a > 0 && toks[a - 1].surface_form.length === 1 && allKanji(toks[a - 1].surface_form) && !toks[a - 1].synth) a--;
+    while (b < toks.length && allKanji(toks[b].surface_form) && (toks[b].word_type === 'UNKNOWN' || toks[b].surface_form.length === 1) && !toks[b].synth) b++;
+    if (b - a < 2) continue;
+    var grp = toks.slice(a, b), sf = grp.map(function (x) { return x.surface_form; }).join('');
+    if (known(sf)) continue;
+    replace(a, b, synth(grp, { reading: names && names.get(sf) ? kata(names.get(sf)) : '', d1: '固有名詞', name: true, type: 'NAME' }));
+    i = a;
+  }
+  /* a name that has furigana elsewhere in the text gets that reading here too */
+  if (names) toks.forEach(function (t) {
+    if ((t.name || t.word_type === 'UNKNOWN') && !t.ruby && names.has(t.surface_form)) { t.reading = kata(names.get(t.surface_form)); t.name = true; }
+  });
+
+  /* 3. words broken at a kanji the tokenizer did not know, or at an old spelling: 顫+え → 顫える, 逢+つて → 逢う,
+        やつ+ぱり → やっぱり, 帰+つて → 帰る */
+  /* 1: a token the tokenizer did not know; 2: a full-size つ standing for っ, which only an old spelling explains */
+  function trigger(i) {
+    var t = toks[i];
+    if (t.synth || t.pos === '記号') return 0;
+    if (t.word_type === 'UNKNOWN' && !isKata(t.surface_form)) return 1;
+    if (/^つ[てたちつけこかくきさしすせそぱぴぷぺぽ]/.test(t.surface_form) && i > 0) return 2;
+    if (t.surface_form === 'つ' && i > 0 && toks[i + 1] && /^[てた]/.test(toks[i + 1].surface_form)) return 2;
+    return 0;
+  }
+  for (var j = 0; j < toks.length; j++) {
+    var why = trigger(j);
+    if (!why) continue;
+    var best = null;
+    for (var a2 = Math.max(0, j - 2); a2 <= j; a2++) {
+      for (var b2 = j + 1; b2 <= Math.min(toks.length, j + 3); b2++) {
+        if (b2 - a2 < 2) continue;
+        var grp2 = toks.slice(a2, b2);
+        if (grp2.some(function (x) { return x.pos === '記号' || x.synth; })) continue;
+        /* a word does not start with a particle, and a full-size つ belongs to the word before it */
+        if (grp2[0].pos === '助詞' || grp2[0].pos === '助動詞' || (why === 2 && a2 === j)) continue;
+        var sf2 = grp2.map(function (x) { return x.surface_form; }).join('');
+        if (sf2.length > 10) continue;
+        /* part of a set phrase the dictionary has as written (に + 就て: について) */
+        if (a2 > 0 && toks[a2 - 1].pos === '助詞' && dict.has(toks[a2 - 1].surface_form + sf2)) {
+          var phrase = toks[a2 - 1].surface_form + sf2, ph = dict.pick(phrase, 'x', '', false);
+          if (ph && (!best || 1e6 > best.score)) best = { a: a2 - 1, b: b2, base: phrase, cls: 'x', hit: ph, form: phrase, score: 1e6 };
+          continue;
+        }
+        [sf2].concat(oldVariants(sf2)).forEach(function (form) {
+          if (why === 2 && form.indexOf('っ') < 0) return;
+          baseForms(form).forEach(function (c) {
+            if (c.stem < 1 || c.b.length < 2 || /^[っゃゅょぁぃぅぇぉんー]/.test(c.b) || !dict.has(c.b)) return;
+            /* the word must start where the written form starts, and keep its kanji */
+            if (c.b.charAt(0) !== form.charAt(0)) return;
+            var hit = dict.pick(c.b, c.cls || 'x', '', true);
+            if (!hit) return;
+            var score = c.stem * 10 - (b2 - a2) - (c.b === form ? 0 : 1);
+            /* before て, た or ない the word is a verb or adjective (顫え + て: 顫える, not the noun 顫え) */
+            var after = toks[b2];
+            if (after && (c.cls === 'v' || c.cls === 'a') && /^(て|で|た|だ|ない|ず|ぬ|ます|れ|られ|せ|させ)/.test(after.surface_form) && (after.pos === '助詞' || after.pos === '助動詞')) score += 2;
+            /* いった after a て form is 行った (帰っていった), elsewhere 言った comes first */
+            if (c.b === 'いく' && a2 > 0 && /[てで]$/.test(toks[a2 - 1].surface_form)) score += 2;
+            /* a full-size つ is only explained by a verb or adjective ending (帰つて, いつた), not by a word as it stands */
+            if (why === 2 && c.b === form) return;
+            if (!best || score > best.score) best = { a: a2, b: b2, base: c.b, cls: c.cls, hit: hit, form: form, score: score };
+          });
+        });
+      }
+    }
+    if (!best) continue;
+    var g = toks.slice(best.a, best.b), surf = g.map(function (x) { return x.surface_form; }).join('');
+    var cls = best.cls || (/[うくぐすつぬぶむる]$/.test(best.base) && best.hit ? 'v' : 'n');
+    if (best.score === 1e6) {
+      replace(best.a, best.b, synth(toks.slice(best.a, best.b), { pos: '副詞', basic: best.base, reading: kata(best.hit.reading || ''), type: 'JOINED' }));
+      j = best.a;
+      continue;
+    }
+    var reading = formReading(surf, best.base, best.hit.reading) || formReading(best.form, best.base, best.hit.reading);
+    replace(best.a, best.b, synth(g, {
+      pos: cls === 'v' ? '動詞' : cls === 'a' ? '形容詞' : best.base === best.form ? '名詞' : '副詞',
+      d1: cls === 'v' || cls === 'a' ? '自立' : '一般', basic: best.base, reading: reading, type: 'JOINED',
+      cform: g[g.length - 1].conjugated_form,
+    }));
+    j = best.a;
+  }
+
+  /* a noun suffix the tokenizer put after a particle or at the start is a noun of its own (と 音 → 音 おと) */
+  toks.forEach(function (t, i) {
+    if (t.pos !== '名詞' || t.pos_detail_1 !== '接尾' || t.pos_detail_2 === '助数詞' || t.pos_detail_2 === '助動詞語幹') return;
+    var prev = toks[i - 1];
+    if (prev && !(prev.pos === '助詞' || prev.pos === '記号')) return;
+    var h = dict.pick(t.surface_form, 'n', '', false);
+    if (h && h.reading) { t.pos_detail_1 = '一般'; t.reading = kata(h.reading); }
+  });
+
+  /* a "noun" that is a verb's let-us form (入ろう, read にゅうろう by the tokenizer) */
+  toks.forEach(function (t, i) {
+    var m = /^([㐀-䶿一-鿿]+)(ろう|よう)$/.exec(t.surface_form);
+    if (!m || t.pos !== '名詞' || !(toks[i + 1] && /^(じゃ|と|か|よ|ね|。|！|」)/.test(toks[i + 1].surface_form))) return;
+    var base = m[1] + 'る', hit = dict.has(base) && dict.pick(base, 'v', '', true);
+    if (hit && hit.rank !== 0) {
+      t.pos = '動詞'; t.pos_detail_1 = '自立'; t.basic_form = base; t.conjugated_form = '未然ウ接続';
+      t.reading = formReading(t.surface_form, base, hit.reading); t.synth = true;
+    }
+  });
+
+  /* 4. a sound word and its と: ドッ + と → どっと, ハッ + と → はっと */
+  for (var k = 0; k + 1 < toks.length; k++) {
+    var w = toks[k], nx = toks[k + 1];
+    if (nx.surface_form !== 'と' || nx.pos !== '助詞' || !isKana(w.surface_form)) continue;
+    var hk = hira(w.surface_form) + 'と';
+    if (!/[っッ]$/.test(w.surface_form) && !(w.word_type === 'UNKNOWN' || !dict.has(hira(w.surface_form)))) continue;
+    if (dict.has(hk)) replace(k, k + 2, synth([w, nx], { pos: '副詞', basic: hk, reading: kata(hk), type: 'JOINED' }));
+  }
+  return toks;
+};
+
+/* Meaning for a word the dictionary does not have as written. w: the word; head: its first token; surface: the word
+   as written (without endings fused on); reading: the reading known for it. Returns { en, reading } or null. */
+Engine.prototype.rescue = function (w, head, surface, reading) {
+  var dict = this.dict, key = w.key, cls = w.cls;
+  function tryKey(k, c, rd, infl) { return k && k !== key ? dict.pick(k, c || cls, rd || '', infl === undefined ? true : infl) : null; }
+  var hit = null, i;
+  if (LAUGH.test(surface) || LAUGH.test(hira(surface))) return { en: '(laughter)', reading: '' };
+  /* a piece of hiragana the tokenizer could not place is a fragment of something, not a word to look up */
+  if (head.word_type === 'UNKNOWN' && /^[ぁ-ゖ]+$/.test(surface)) return null;
+  /* old spelling: 思ふ → 思う, ゐる → いる, 考へる → 考える, やつぱり → やっぱり */
+  var forms = uniq([key, surface]);
+  for (i = 0; !hit && i < forms.length; i++) {
+    var vs = oldVariants(forms[i]);
+    for (var j = 0; !hit && j < vs.length; j++) hit = tryKey(vs[j]);
+  }
+  if (hit) return hit;
+  /* a word ending in と, に, な (漠然と, ぶらりと → ぶらり) */
+  if (/[とになだ]$/.test(surface) && surface.length > 2) hit = tryKey(surface.slice(0, -1), '', '', false) || tryKey(hira(surface.slice(0, -1)), '', '', false);
+  if (hit) return hit;
+  /* kana: in hiragana (モグモグ → もぐもぐ), with と (ドッ → どっと), drawn-out vowels shortened (ザアー → ざあ) */
+  if (isKana(surface)) {
+    var h = hira(surface);
+    var cands = [h, h + 'と', h.replace(/ー+$/, ''), h.replace(/っ$/, '') + 'と', h.replace(/^(.{2,3})\1$/, '$1'), h.replace(/^(.{2,3})\1$/, '$1') + 'と'];
+    for (i = 0; !hit && i < cands.length; i++) hit = tryKey(cands[i], '', '', false);
+    if (hit) return hit;
+  }
+  /* older loanword spellings: ストオヴ → ストーブ, シャッタア → シャッター */
+  if (isKata(surface)) {
+    var lv = loanVariants(surface);
+    for (i = 0; !hit && i < lv.length; i++) hit = tryKey(lv[i], '', '', false);
+    if (hit) return hit;
+  }
+  /* a polite prefix (お客 → 客) */
+  var pm = /^(お|ご|御)(.+)$/.exec(surface);
+  if (pm && pm[2].length >= 1) {
+    hit = tryKey(pm[2], '', '', false) || tryKey(pm[2] + 'さん', '', '', false);
+    if (hit) return { en: hit.en, reading: '' };
+  }
+  /* the same word written with kana for one of its kanji, or with other kanji: 気もち (気持ち), 黄いろ (黄色) */
+  var rd = hira(reading || '');
+  if (rd && rd !== surface && hasKanji(surface)) {
+    var kj = Array.from(surface).filter(function (c) { return KANJI.test(c); });
+    var list = dict.entries(rd).filter(function (e) {
+      return e.k.some(function (k) { return kj.every(function (c) { return k.indexOf(c) >= 0; }); });
+    });
+    if (list.length) {
+      var k0 = list[0].k.filter(function (k) { return kj.every(function (c) { return k.indexOf(c) >= 0; }); })[0];
+      hit = dict.pick(k0, cls, rd, false);
+      if (hit) return hit;
+    }
+  }
+  /* a written form the tokenizer did not take back to its base form: 入ろう → 入る, 恐ろしく → 恐ろしい */
+  if (hasKanji(surface)) {
+    var bf = baseForms(surface).filter(function (c) { return c.b !== surface && c.stem >= 1 && c.b.charAt(0) === surface.charAt(0) && dict.has(c.b); });
+    bf.sort(function (a, b) { return b.stem - a.stem; });
+    for (i = 0; !hit && i < bf.length && i < 6; i++) {
+      var hh = dict.pick(bf[i].b, bf[i].cls || cls, '', true);
+      if (hh) hit = { en: hh.en, reading: formReading(surface, bf[i].b, hh.reading) ? hira(formReading(surface, bf[i].b, hh.reading)) : '', base: bf[i].b, baseReading: hh.reading };
+    }
+    if (hit) return hit;
+  }
+  /* a word with the author's furigana that the dictionary lacks is left to be called a name or rare word */
+  if (head.ruby && allKanji(surface) && surface.length >= 2) return null;
+  /* a compound the dictionary only has in pieces: 単細胞動物 → single-celled + animal */
+  if (surface.length >= 2 && surface.length <= 12) {
+    var parts = this.pieces(surface);
+    if (parts) return { en: parts.map(function (p) { return p.en; }).join(' + '), reading: '' };
+  }
+  /* a number and its counter: 500秒 → 500 + second */
+  var nc = /^([0-9０-９.,]+)(.+)$/.exec(surface);
+  if (nc) { var ch = dict.pick(nc[2], 'n', '', false); if (ch) return { en: nc[1].replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }) + ' ' + ch.en.split(', ')[0], reading: '' }; }
+  /* last: what its kanji mean (屹 "towering mountains"), from KANJIDIC */
+  var km = this.kanji, means = Array.from(surface).filter(function (c) { return KANJI.test(c); }).map(function (c) { return km.get(c); });
+  if (means.length && means.length <= 3 && means.every(Boolean)) {
+    return { en: means.map(function (m) { return m.split('; ').slice(0, means.length > 1 ? 1 : 2).join(', '); }).join(' + ') + ' (kanji)', reading: '' };
+  }
+  return null;
+};
+/* the fewest dictionary words (two or three) that make up s, with a short gloss each; null when there are none */
+Engine.prototype.pieces = function (s) {
+  var dict = this.dict, n = s.length, best = new Array(n + 1);
+  best[0] = { parts: [] };
+  for (var i = 0; i < n; i++) {
+    if (!best[i] || best[i].parts.length >= 3) continue;
+    for (var j = Math.min(n, i + 8); j > i; j--) {
+      var piece = s.slice(i, j);
+      if (piece.length === 1 && !KANJI.test(piece)) continue;
+      if (!dict.has(piece)) continue;
+      var cand = best[i].parts.concat([piece]);
+      if (!best[j] || best[j].parts.length > cand.length) best[j] = { parts: cand };
+    }
+  }
+  if (!best[n] || best[n].parts.length < 2) return null;
+  if (best[n].parts.every(function (p) { return p.length === 1; }) && !allKanji(s)) return null;
+  var out = [];
+  for (var k = 0; k < best[n].parts.length; k++) {
+    var h = dict.pick(best[n].parts[k], 'n', '', false);
+    if (!h) return null;
+    out.push({ s: best[n].parts[k], en: h.en.split(', ')[0] });
+  }
+  return out;
+};
+/* what to say about a word nothing was found for */
+function unknownGloss(surface, reading, head, isName) {
+  var h = hira(surface);
+  if (LAUGH.test(surface) || LAUGH.test(h)) return '(laughter)';
+  if (!isName && isKana(surface) && soundLike(surface)) return '(sound or manner word)';
+  var rd = reading || (isKana(surface) ? surface : '');
+  var ro = rd ? romaji(rd) : '';
+  if (isKata(surface)) return ro + ' (foreign name or word)';
+  if (head && head.ruby && !head.name && allKanji(surface) && surface.length >= 2 && ro) return ro + ' (a name or rare word)';
+  if (isName || (head && head.pos_detail_1 === '固有名詞')) {
+    var kind = head && head.pos_detail_2 === '地域' ? 'place' : head && head.pos_detail_2 === '組織' ? 'organisation' : 'name';
+    return ro ? ro + ' (probably a ' + kind + ')' : '(probably a ' + kind + ')';
+  }
+  return '';
+}
+
 /* ---------- phrases ---------- */
 
 var NOMINAL = { 'こと': 'thing; fact', '事': 'thing; fact', 'の': '', 'ん': '', 'もの': 'thing', '物': 'thing', 'よう': 'manner; way',
@@ -423,6 +975,8 @@ function kindOf(t) {
   var pos = t.pos, d1 = t.pos_detail_1;
   if (pos === '記号') return 'PUNCT';
   if (/^\s+$/.test(t.surface_form)) return 'PUNCT';
+  if (/^[!-\/:-@\[-`{-~！-／：-＠［-｀｛-･、。〃〜「」『』【】〔〕（）〈〉《》・…‥]+$/.test(t.surface_form)) return 'PUNCT';
+  if (/^[A-Za-zＡ-Ｚａ-ｚ'’]+$/.test(t.surface_form)) return 'PUNCT';
   if (pos === '助詞') return d1 === '接続助詞' ? 'CONJP' : 'PART';
   if (pos === '助動詞') return 'AUX';
   if (pos === '動詞' || pos === '形容詞') return d1 === '自立' ? 'CONTENT' : 'TAIL';
@@ -443,9 +997,12 @@ function clsOf(t) {
   return 'x';
 }
 
-function Engine(tokenizer, lines) {
+/* kanji: lines of kanji.txt (a kanji, a tab, its meanings), for kanji no word explains */
+function Engine(tokenizer, lines, kanji) {
   this.tokenizer = tokenizer;
   this.dict = new Dict(lines);
+  var km = this.kanji = new Map();
+  (kanji || []).forEach(function (l) { var t = l.indexOf('\t'); if (t > 0) km.set(l.slice(0, t), l.slice(t + 1)); });
 }
 
 /* Longest run of tokens starting at i that the dictionary knows as one word or set phrase. */
@@ -488,6 +1045,8 @@ Engine.prototype.merge = function (toks, i) {
     /* a word may not cut a number in two (一二〇 must not yield 一二), and file numbers with 〇 stay as digits */
     if (numRun >= 2 && n < numRun) continue;
     if (numRun && /[〇零]/.test(key)) continue;
+    /* old spelling of a compound: 思ひ出す → 思い出す */
+    if (!dict.has(key) && /[ゐゑふへひつ]/.test(key)) key = oldVariants(key).filter(function (v) { return dict.has(v); })[0] || key;
     if (dict.has(key) && (hasKanji(key) || key.length >= 4)) {
       /* a noun followed by する is left alone: the noun gets its own gloss */
       if (n === 2 && lemma(last) === 'する') continue;
@@ -504,9 +1063,9 @@ Engine.prototype.merge = function (toks, i) {
   return null;
 };
 
-Engine.prototype.paragraph = function (text) {
+Engine.prototype.paragraph = function (text, spans, names) {
   var self = this, dict = this.dict;
-  var toks = this.tokenizer.tokenize(text);
+  var toks = this.repair(this.tokenizer.tokenize(text), spans, names);
   var chunks = [], chunk = null, word = null, pendingHead = '', joinNext = false, prefixOpen = false;
 
   function closeChunk() { chunk = null; word = null; joinNext = false; prefixOpen = false; }
@@ -642,7 +1201,7 @@ Engine.prototype.paragraph = function (text) {
       }
       var head = w.toks[w.preLen || 0] || w.toks[0];
       var en = '', rd = '';
-      var isNumber = head.pos_detail_1 === '数' && /^[0-9０-９.,]+$/.test(head.surface_form);
+      var isNumber = /^[0-9０-９.,，．]+$/.test(head.surface_form);
       if (!isNumber) {
         var stemReading = '';
         if (w.merged) stemReading = '';
@@ -695,7 +1254,8 @@ Engine.prototype.paragraph = function (text) {
         }
         /* a word the tokenizer only knew as separate pieces (令 + 和): the pieces' readings may not be
            the word's reading, so the dictionary's reading wins when they disagree (りょうわ → れいわ) */
-        if (hit && !w.minutes && !w.number && w.merged && !w.preLen && !spanName && spanKnown && !hit.old && hit.reading && hasKanji(w.key)) {
+        var spanRuby = spanToks.some(function (t) { return t.ruby; });
+        if (hit && !w.minutes && !w.number && w.merged && !w.preLen && !spanName && spanKnown && !spanRuby && !hit.old && hit.reading && hasKanji(w.key)) {
           var fixed = null;
           if (!endsInflected) {
             if (hit.readings.indexOf(spanReading) < 0) fixed = remapReading(spanSurface, w.key, hit.reading);
@@ -718,10 +1278,26 @@ Engine.prototype.paragraph = function (text) {
         /* ない on its own is "not" or "there is none", never the dictionary's other senses of the kana */
         if (w.key === 'ない' && head.pos === '形容詞') hit = { en: 'not; there is none', reading: '' };
         if (hit && w.potNeg) hit = { en: 'cannot ' + hit.en.replace(/^to /, '').replace(/, to /g, ', '), reading: hit.reading };
-        if (hit) { en = hit.en; rd = hit.reading; }
-        else if (head.pos_detail_1 === '固有名詞') {
-          en = head.pos_detail_2 === '人名' ? '(a name)' : head.pos_detail_2 === '地域' ? '(a place)' : head.pos_detail_2 === '組織' ? '(an organisation)' : '(a name)';
+        /* nothing found as written: older spellings, sound words, other ways of writing the word, pieces, names */
+        var own = w.merged ? w.toks.slice(0, w.mergedN) : w.toks.slice(w.preLen || 0, (w.preLen || 0) + 1);
+        var ownSurface = own.map(function (t) { return t.surface_form; }).join('');
+        var ownReading = own.map(function (t) { return t.reading && t.reading !== '*' ? t.reading : isKana(t.surface_form) || isKata(t.surface_form) ? t.surface_form : ''; }).join('');
+        var isName = head.name || (head.pos_detail_1 === '固有名詞' && !isKata(ownSurface));
+        if (!hit && !w.minutes && !w.number && !isName) {
+          hit = self.rescue(w, head, ownSurface, ownReading);
+          /* found by a different base form: the tokenizer's reading of it was a guess, the dictionary's is used */
+          if (hit && hit.reading && hit.base && !head.ruby) {
+            var ownFrom = w.merged ? 0 : (w.preLen || 0), ownTo = ownFrom + own.length, fixed = [];
+            function addSeg(p) { var ls = fixed[fixed.length - 1]; if (ls && !ls[1] && !p[1]) ls[0] += p[0]; else fixed.push([p[0], p[1]]); }
+            w.toks.slice(0, ownFrom).forEach(function (t) { furi(t.surface_form, t.reading).forEach(addSeg); });
+            furi(ownSurface, hit.reading).forEach(addSeg);
+            w.toks.slice(ownTo).forEach(function (t) { furi(t.surface_form, t.reading).forEach(addSeg); });
+            segs = fixed;
+            hit = { en: hit.en, reading: hit.baseReading || '' };
+          }
         }
+        if (hit) { en = hit.en; rd = hit.reading; }
+        else en = unknownGloss(ownSurface, ownReading, head, isName);
       }
       var o = { s: segs };
       if (en) o.e = en;
@@ -733,7 +1309,9 @@ Engine.prototype.paragraph = function (text) {
       return o;
     });
     var item = { w: words };
-    var g = grammarAt(toks, c.from, c.to);
+    var g = grammarAt(toks, c.from, c.to, c.words.filter(function (w) { return w.merged && w.mergedN > 1; }).map(function (w) {
+      var at = toks.indexOf(w.toks[0]); return [at, at + w.mergedN];
+    }));
     if (g.length) item.g = g;
     if (c.head) item.h = c.head;
     if (c.tail) item.t = c.tail;
@@ -744,11 +1322,40 @@ Engine.prototype.paragraph = function (text) {
   return out;
 };
 
-Engine.prototype.analyze = function (text) {
-  var self = this;
-  var paras = String(text).replace(/\r\n?/g, '\n').split('\n').map(function (line) {
+/* ruby: the text's own furigana, [start, length, reading] in text (as Aozora Bunko gives it); may be left out */
+Engine.prototype.analyze = function (text, ruby) {
+  var self = this, src = String(text).replace(/\r\n?/g, '\n');
+  var spans = (Array.isArray(ruby) ? ruby : []).filter(function (r) {
+    return Array.isArray(r) && r[0] >= 0 && r[1] > 0 && r[0] + r[1] <= src.length && typeof r[2] === 'string' && /^[ぁ-ゖァ-ヺー]+$/.test(r[2]);
+  }).sort(function (a, b) { return a[0] - b[0]; });
+  /* a word given furigana once keeps that reading where it comes again without (names, mostly) */
+  var names = new Map();
+  spans.forEach(function (r) { var base = src.substr(r[0], r[1]); if (hasKanji(base) && !names.has(base)) names.set(base, hira(r[2])); });
+  /* where such a word of two kanji or more comes again without furigana, it gets the same, marked as borrowed:
+     it is only used where the tokenizer breaks the word up or does not know it (names, mostly) */
+  var covered = new Uint8Array(src.length + 1);
+  spans.forEach(function (r) { for (var c = r[0]; c < r[0] + r[1]; c++) covered[c] = 1; });
+  var more = [];
+  names.forEach(function (rd, base) {
+    if (base.length < 2 || !/^[㐀-䶿一-鿿豈-﫿々〆ヶ]+$/.test(base)) return;
+    var at = src.indexOf(base);
+    while (at >= 0) {
+      if (!covered[at] && !covered[at + base.length - 1]) more.push([at, base.length, rd, true]);
+      at = src.indexOf(base, at + base.length);
+    }
+  });
+  if (more.length) spans = spans.concat(more).sort(function (a, b) { return a[0] - b[0]; });
+  var off = 0, n = 0;
+  var paras = src.split('\n').map(function (line) {
+    var lead = line.length - line.replace(/^[\s　]+/, '').length;
     var trimmed = line.replace(/^[\s　]+|[\s　]+$/g, '');
-    return trimmed ? self.paragraph(trimmed) : [];
+    var from = off + lead, to = from + trimmed.length, mine = [];
+    while (n < spans.length && spans[n][0] < from) n++;
+    for (var q = n; q < spans.length && spans[q][0] < to; q++) {
+      if (spans[q][0] + spans[q][1] <= to) mine.push([spans[q][0] - from, spans[q][1], spans[q][2], spans[q][3]]);
+    }
+    off += line.length + 1;
+    return trimmed ? self.paragraph(trimmed, mine, names) : [];
   });
   /* collapse runs of blank lines */
   var clean = [];
@@ -757,6 +1364,6 @@ Engine.prototype.analyze = function (text) {
   return { v: VERSION, paras: clean };
 };
 
-root.YomuEngine = { VERSION: VERSION, create: function (tokenizer, lines) { return new Engine(tokenizer, lines); }, furi: furi };
+root.YomuEngine = { VERSION: VERSION, create: function (tokenizer, lines, kanji) { return new Engine(tokenizer, lines, kanji); }, furi: furi, romaji: romaji };
 if (typeof module !== 'undefined' && module.exports) module.exports = root.YomuEngine;
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

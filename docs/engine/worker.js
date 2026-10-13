@@ -14,7 +14,7 @@ self.onmessage = function (ev) {
   else if (m.type === 'analyze') {
     try {
       if (!engine) throw new Error('engine not ready');
-      self.postMessage({ type: 'result', id: m.id, analysis: engine.analyze(m.text) });
+      self.postMessage({ type: 'result', id: m.id, analysis: engine.analyze(m.text, m.ruby) });
     } catch (err) {
       self.postMessage({ type: 'fail', id: m.id, message: String((err && err.message) || err) });
     }

@@ -347,11 +347,11 @@ body.no-gram .lg { display: none; }
 (function () {
 'use strict';
 
-var AV = 5;            /* analysis version the engine produces */
+var AV = 6;            /* analysis version the engine produces */
 var MAX = 30000;       /* characters per text */
 var SAMPLE = { id: 'sample', sample: true, title: '片目のだるま', created: 0,
   text: '祖母の家の棚に、片目だけ黒いだるまが置いてある。試験に合格したら、もう片方の目を入れるのだと祖母は言った。私は毎晩そのだるまを見ながら、辞書を引かずに本を読む練習を続けている。分からない言葉は、前後の文から意味を考えるようにしたら、少しずつ読めるようになってきた。' };
-var SAMPLE_AN = {"v":5,"paras":[[{"w":[{"s":[["祖母","そぼ"]],"e":"grandmother"},{"s":[["の",""]],"f":1}],"d":["祖母","そぼ","grandmother"]},{"w":[{"s":[["家","いえ"]],"e":"house, residence"},{"s":[["の",""]],"f":1}],"d":["家","いえ","house, residence"]},{"w":[{"s":[["棚","たな"]],"e":"shelf, ledge"},{"s":[["に",""]],"f":1}],"t":"、","d":["棚","たな","shelf, ledge"]},{"w":[{"s":[["片目","かため"]],"e":"one eye, one of one's eyes"},{"s":[["だけ",""]],"f":1}],"g":[["〜だけ","only; just"]],"d":["片目","かため","one eye, one of one's eyes"]},{"w":[{"s":[["黒","くろ"],["い",""]],"e":"black"}],"d":["黒い","くろい","black"]},{"w":[{"s":[["だるま",""]],"e":"daruma, tumbling doll"},{"s":[["が",""]],"f":1}],"d":["だるま","","daruma, tumbling doll"]},{"w":[{"s":[["置","お"],["いてある",""]],"e":"to put, to place"}],"g":[["〜てある","has been done and stays so"]],"t":"。","d":["置く","おく","to put, to place"]},{"w":[{"s":[["試験","しけん"]],"e":"examination, exam"},{"s":[["に",""]],"f":1}],"d":["試験","しけん","examination, exam"]},{"w":[{"s":[["合格","ごうかく"],["したら",""]],"e":"success, passing (e.g. exam)"}],"g":[["〜たら","when; if; once"]],"t":"、","d":["合格","ごうかく","success, passing (e.g. exam)"]},{"w":[{"s":[["もう",""]],"e":"now, soon"}],"d":["もう","","now, soon"]},{"w":[{"s":[["片方","かたほう"]],"e":"one side, one party"},{"s":[["の",""]],"f":1}],"d":["片方","かたほう","one side, one party"]},{"w":[{"s":[["目","め"]],"e":"eye, eyeball"},{"s":[["を",""]],"f":1}],"d":["目","め","eye, eyeball"]},{"w":[{"s":[["入","い"],["れる",""]],"e":"to put in, to let in"},{"s":[["のだ",""]],"f":1},{"s":[["と",""]],"f":1}],"g":[["〜のだ","explains or stresses the situation"]],"d":["入れる","いれる","to put in, to let in"]},{"w":[{"s":[["祖母","そぼ"]],"e":"grandmother"},{"s":[["は",""]],"f":1}],"d":["祖母","そぼ","grandmother"]},{"w":[{"s":[["言","い"],["った",""]],"e":"to say, to utter"}],"t":"。","d":["言う","いう","to say, to utter"]},{"w":[{"s":[["私","わたし"]],"e":"I, me"},{"s":[["は",""]],"f":1}],"d":["私","わたし","I, me"]},{"w":[{"s":[["毎晩","まいばん"]],"e":"every night"}],"d":["毎晩","まいばん","every night"]},{"w":[{"s":[["その",""]],"e":"that, the"},{"s":[["だるま",""]],"e":"daruma, tumbling doll"},{"s":[["を",""]],"f":1}],"d":["だるま","","daruma, tumbling doll"]},{"w":[{"s":[["見","み"],["ながら",""]],"e":"to see, to look"}],"g":[["〜ながら","while doing"]],"t":"、","d":["見る","みる","to see, to look"]},{"w":[{"s":[["辞書","じしょ"],["を",""],["引","ひ"],["かず",""]],"e":"to consult a dictionary"},{"s":[["に",""]],"f":1}],"g":[["〜ずに","without doing"]],"d":["辞書を引く","じしょをひく","to consult a dictionary"]},{"w":[{"s":[["本","ほん"]],"e":"book, volume"},{"s":[["を",""]],"f":1}],"d":["本","ほん","book, volume"]},{"w":[{"s":[["読","よ"],["む",""]],"e":"to read"}],"d":["読む","よむ","to read"]},{"w":[{"s":[["練習","れんしゅう"]],"e":"practice, training"},{"s":[["を",""]],"f":1}],"d":["練習","れんしゅう","practice, training"]},{"w":[{"s":[["続","つづ"],["けている",""]],"e":"to continue, to keep up"}],"g":[["〜ている","is doing; ongoing state"]],"t":"。","d":["続ける","つづける","to continue, to keep up"]},{"w":[{"s":[["分","わ"],["からない",""]],"e":"to understand, to comprehend"}],"g":[["〜ない","not"]],"d":["分かる","わかる","to understand, to comprehend"]},{"w":[{"s":[["言葉","ことば"]],"e":"language, dialect"},{"s":[["は",""]],"f":1}],"t":"、","d":["言葉","ことば","language, dialect"]},{"w":[{"s":[["前後","ぜんご"]],"e":"front and rear, front and back"},{"s":[["の",""]],"f":1}],"d":["前後","ぜんご","front and rear, front and back"]},{"w":[{"s":[["文","ぶん"]],"e":"sentence"},{"s":[["から",""]],"f":1}],"d":["文","ぶん","sentence"]},{"w":[{"s":[["意味","いみ"]],"e":"meaning, significance"},{"s":[["を",""]],"f":1}],"d":["意味","いみ","meaning, significance"]},{"w":[{"s":[["考","かんが"],["える",""]],"e":"to think (about, of)"},{"s":[["よう",""]],"e":"manner; way"},{"s":[["に",""]],"f":1}],"g":[["〜ようにする","make a point of doing"]],"d":["考える","かんがえる","to think (about, of)"]},{"w":[{"s":[["したら",""]],"e":"to do, to carry out"}],"g":[["〜たら","when; if; once"]],"t":"、","d":["する","","to do, to carry out"]},{"w":[{"s":[["少","すこ"],["し",""]],"e":"small quantity, little"},{"s":[["ずつ",""]],"f":1}],"d":["少し","すこし","small quantity, little"]},{"w":[{"s":[["読","よ"],["める",""]],"e":"can read"},{"s":[["よう",""]],"e":"manner; way"},{"s":[["に",""]],"f":1}],"g":[["〜ようになる","come to; reach the point where"]],"d":["読める","","can read"]},{"w":[{"s":[["なってきた",""]],"e":"to become, to get"}],"g":[["〜てくる","come to; has been doing up to now"]],"t":"。","d":["なる","","to become, to get"]}]]};
+var SAMPLE_AN = {"v":6,"paras":[[{"w":[{"s":[["祖母","そぼ"]],"e":"grandmother"},{"s":[["の",""]],"f":1}],"d":["祖母","そぼ","grandmother"]},{"w":[{"s":[["家","いえ"]],"e":"house, residence"},{"s":[["の",""]],"f":1}],"d":["家","いえ","house, residence"]},{"w":[{"s":[["棚","たな"]],"e":"shelf, ledge"},{"s":[["に",""]],"f":1}],"t":"、","d":["棚","たな","shelf, ledge"]},{"w":[{"s":[["片目","かため"]],"e":"one eye, one of one's eyes"},{"s":[["だけ",""]],"f":1}],"g":[["〜だけ","only; just"]],"d":["片目","かため","one eye, one of one's eyes"]},{"w":[{"s":[["黒","くろ"],["い",""]],"e":"black"}],"d":["黒い","くろい","black"]},{"w":[{"s":[["だるま",""]],"e":"daruma, tumbling doll"},{"s":[["が",""]],"f":1}],"d":["だるま","","daruma, tumbling doll"]},{"w":[{"s":[["置","お"],["いてある",""]],"e":"to put, to place"}],"g":[["〜てある","has been done and stays so"]],"t":"。","d":["置く","おく","to put, to place"]},{"w":[{"s":[["試験","しけん"]],"e":"examination, exam"},{"s":[["に",""]],"f":1}],"d":["試験","しけん","examination, exam"]},{"w":[{"s":[["合格","ごうかく"],["したら",""]],"e":"success, passing (e.g. exam)"}],"g":[["〜たら","when; if; once"]],"t":"、","d":["合格","ごうかく","success, passing (e.g. exam)"]},{"w":[{"s":[["もう",""]],"e":"now, soon"}],"d":["もう","","now, soon"]},{"w":[{"s":[["片方","かたほう"]],"e":"one side, one party"},{"s":[["の",""]],"f":1}],"d":["片方","かたほう","one side, one party"]},{"w":[{"s":[["目","め"]],"e":"eye, eyeball"},{"s":[["を",""]],"f":1}],"d":["目","め","eye, eyeball"]},{"w":[{"s":[["入","い"],["れる",""]],"e":"to put in, to let in"},{"s":[["のだ",""]],"f":1},{"s":[["と",""]],"f":1}],"g":[["〜のだ","explains or stresses the situation"]],"d":["入れる","いれる","to put in, to let in"]},{"w":[{"s":[["祖母","そぼ"]],"e":"grandmother"},{"s":[["は",""]],"f":1}],"d":["祖母","そぼ","grandmother"]},{"w":[{"s":[["言","い"],["った",""]],"e":"to say, to utter"}],"t":"。","d":["言う","いう","to say, to utter"]},{"w":[{"s":[["私","わたし"]],"e":"I, me"},{"s":[["は",""]],"f":1}],"d":["私","わたし","I, me"]},{"w":[{"s":[["毎晩","まいばん"]],"e":"every night"}],"d":["毎晩","まいばん","every night"]},{"w":[{"s":[["その",""]],"e":"that, the"},{"s":[["だるま",""]],"e":"daruma, tumbling doll"},{"s":[["を",""]],"f":1}],"d":["だるま","","daruma, tumbling doll"]},{"w":[{"s":[["見","み"],["ながら",""]],"e":"to see, to look"}],"g":[["〜ながら","while doing"]],"t":"、","d":["見る","みる","to see, to look"]},{"w":[{"s":[["辞書","じしょ"],["を",""],["引","ひ"],["かず",""]],"e":"to consult a dictionary"},{"s":[["に",""]],"f":1}],"g":[["〜ずに","without doing"]],"d":["辞書を引く","じしょをひく","to consult a dictionary"]},{"w":[{"s":[["本","ほん"]],"e":"book, volume"},{"s":[["を",""]],"f":1}],"d":["本","ほん","book, volume"]},{"w":[{"s":[["読","よ"],["む",""]],"e":"to read"}],"d":["読む","よむ","to read"]},{"w":[{"s":[["練習","れんしゅう"]],"e":"practice, training"},{"s":[["を",""]],"f":1}],"d":["練習","れんしゅう","practice, training"]},{"w":[{"s":[["続","つづ"],["けている",""]],"e":"to continue, to keep up"}],"g":[["〜ている","is doing; ongoing state"]],"t":"。","d":["続ける","つづける","to continue, to keep up"]},{"w":[{"s":[["分","わ"],["からない",""]],"e":"to understand, to comprehend"}],"g":[["〜ない","not"]],"d":["分かる","わかる","to understand, to comprehend"]},{"w":[{"s":[["言葉","ことば"]],"e":"language, dialect"},{"s":[["は",""]],"f":1}],"t":"、","d":["言葉","ことば","language, dialect"]},{"w":[{"s":[["前後","ぜんご"]],"e":"front and rear, front and back"},{"s":[["の",""]],"f":1}],"d":["前後","ぜんご","front and rear, front and back"]},{"w":[{"s":[["文","ぶん"]],"e":"sentence"},{"s":[["から",""]],"f":1}],"d":["文","ぶん","sentence"]},{"w":[{"s":[["意味","いみ"]],"e":"meaning, significance"},{"s":[["を",""]],"f":1}],"d":["意味","いみ","meaning, significance"]},{"w":[{"s":[["考","かんが"],["える",""]],"e":"to think (about, of)"},{"s":[["よう",""]],"e":"manner; way"},{"s":[["に",""]],"f":1}],"g":[["〜ようにする","make a point of doing"]],"d":["考える","かんがえる","to think (about, of)"]},{"w":[{"s":[["したら",""]],"e":"to do, to carry out"}],"g":[["〜たら","when; if; once"]],"t":"、","d":["する","","to do, to carry out"]},{"w":[{"s":[["少","すこ"],["し",""]],"e":"small quantity, little"},{"s":[["ずつ",""]],"f":1}],"d":["少し","すこし","small quantity, little"]},{"w":[{"s":[["読","よ"],["める",""]],"e":"to be able to read, to be legible"},{"s":[["よう",""]],"e":"manner; way"},{"s":[["に",""]],"f":1}],"g":[["〜ようになる","come to; reach the point where"]],"d":["読める","よめる","to be able to read, to be legible"]},{"w":[{"s":[["なってきた",""]],"e":"to bear fruit"}],"g":[["〜てくる","come to; has been doing up to now"]],"t":"。","d":["なる","","to bear fruit"]}]]};
 
 function $(id) { return document.getElementById(id); }
 function el(tag, cls, text) {
@@ -478,14 +478,15 @@ var ENG = {
     this.ready.catch(function () { self.ready = null; });
     return this.ready;
   },
-  analyze: function (text) {
+  /* ruby: the text's own furigana as [start, length, reading] (texts from Aozora Bunko), or nothing */
+  analyze: function (text, ruby) {
     var self = this;
     return this.start().then(function () {
-      if (self.direct) return self.direct.analyze(text);
+      if (self.direct) return self.direct.analyze(text, ruby || []);
       return new Promise(function (resolve, reject) {
         var id = ++self.seq;
         self.jobs.set(id, { resolve: resolve, reject: reject });
-        self.worker.postMessage({ type: 'analyze', id: id, text: text });
+        self.worker.postMessage({ type: 'analyze', id: id, text: text, ruby: ruby || [] });
       });
     });
   },
@@ -496,7 +497,7 @@ function countPhrases(an) {
   return n;
 }
 function progressText(d, t) {
-  return d < t ? 'Loading the dictionary: part ' + d + ' of ' + t + '. It is about 36 MB the first time; after that it is kept on this device.' : 'Reading your text.';
+  return d < t ? 'Loading the dictionary: part ' + d + ' of ' + t + '. It is about 40 MB the first time; after that it is kept on this device.' : 'Reading your text.';
 }
 
 /* ---------- saved texts ---------- */
@@ -508,7 +509,7 @@ function initStore() {
       S.db = db; S.mode = 'db';
       S.texts = snap.docs.map(function (d) {
         var x = d.data() || {};
-        return { id: d.id, title: x.title || '', by: x.by || '', text: x.text || '', created: x.created || 0, seen: (x.seen || []).slice(), n: x.n || 0, av: x.av || 0 };
+        return { id: d.id, title: x.title || '', by: x.by || '', text: x.text || '', ruby: x.ruby || '', created: x.created || 0, seen: (x.seen || []).slice(), n: x.n || 0, av: x.av || 0 };
       });
       return true;
     }).catch(function () { return null; });
@@ -521,7 +522,7 @@ function saveLocal() { return LS.set('yomu.texts', S.texts.filter(function (t) {
 function createText(t) {
   if (S.mode === 'db') {
     var ref = S.db.collection('texts').doc();
-    return ref.set({ title: t.title, by: t.by || '', text: t.text, created: t.created, seen: (t.seen || []).slice(), n: t.n, av: t.av }).then(function () { t.id = ref.id; });
+    return ref.set({ title: t.title, by: t.by || '', text: t.text, ruby: t.ruby || '', created: t.created, seen: (t.seen || []).slice(), n: t.n, av: t.av }).then(function () { t.id = ref.id; });
   }
   t.id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   S.texts.unshift(t);
@@ -611,7 +612,9 @@ function renderLibrary() {
 var BACKUP_APP = 'yaoki-reader';
 function exportLibrary() {
   var list = S.texts.filter(function (t) { return !t.temp; }).map(function (t) {
-    return { title: t.title, by: t.by || '', text: t.text, created: t.created, seen: (t.seen || []).slice(), n: t.n || 0, av: t.av || 0 };
+    var o = { title: t.title, by: t.by || '', text: t.text, created: t.created, seen: (t.seen || []).slice(), n: t.n || 0, av: t.av || 0 };
+    if (t.ruby) o.ruby = t.ruby;
+    return o;
   });
   if (!list.length) { toast('There are no texts of yours to save yet.'); return; }
   var data = { app: BACKUP_APP, version: 1, exported: new Date().toISOString(), texts: list };
@@ -629,7 +632,9 @@ function cleanEntry(x) {
   var title = (typeof x.title === 'string' && x.title.trim() ? x.title.trim() : firstLine(text).slice(0, 16)).slice(0, 60);
   var seen = Array.isArray(x.seen) ? x.seen.filter(function (i) { return typeof i === 'number' && i >= 0 && i % 1 === 0; }) : [];
   var by = typeof x.by === 'string' ? x.by.trim().slice(0, 60) : '';
-  return { title: title, by: by, text: text, created: typeof x.created === 'number' ? x.created : Date.now(), seen: seen,
+  /* furigana kept with a text from Aozora Bunko: only spans inside the text */
+  var ruby = AZ.rubyToString(AZ.rubyFromString(x.ruby).filter(function (r) { return r[0] + r[1] <= text.length; }));
+  return { title: title, by: by, text: text, ruby: ruby, created: typeof x.created === 'number' ? x.created : Date.now(), seen: seen,
     n: typeof x.n === 'number' ? x.n : 0, av: typeof x.av === 'number' ? x.av : 0 };
 }
 function importLibrary(file) {
@@ -686,7 +691,13 @@ function addBusy(on) {
 function submitAdd(e) {
   e.preventDefault();
   if (adding) return;
-  var text = $('add-text').value.replace(/^\s+|\s+$/g, '');
+  var text = $('add-text').value.replace(/^\s+|\s+$/g, ''), ruby = [];
+  /* text copied in Aozora Bunko's notation (漢字《かんじ》): its furigana are kept and the marks taken out */
+  if (/《[ぁ-ゖァ-ヺー]+》/.test(text)) {
+    var conv = AZ.convertText(text), lead = conv.text.length - conv.text.replace(/^\s+/, '').length;
+    text = conv.text.replace(/^\s+|\s+$/g, '');
+    ruby = conv.ruby.map(function (r) { return [r[0] - lead, r[1], r[2]]; }).filter(function (r) { return r[0] >= 0 && r[0] + r[1] <= text.length; });
+  }
   addProblem('');
   if (!text) { addProblem('Paste some Japanese text first.'); return; }
   if (text.length > MAX) { addProblem('This is ' + num(text.length) + ' characters. The limit is ' + num(MAX) + ', so add it in parts, such as one chapter at a time.'); return; }
@@ -697,8 +708,8 @@ function submitAdd(e) {
     $('add-bar').style.width = Math.max(3, Math.round(d / t * 100)) + '%';
     $('add-status').textContent = progressText(d, t);
   };
-  ENG.analyze(text).then(function (an) {
-    var t = { title: title, text: text, created: Date.now(), seen: [], n: countPhrases(an), av: an.v };
+  ENG.analyze(text, ruby).then(function (an) {
+    var t = { title: title, text: text, ruby: AZ.rubyToString(ruby), created: Date.now(), seen: [], n: countPhrases(an), av: an.v };
     return createText(t).catch(function (err) {
       t.temp = true; t.id = 'temp' + Date.now();
       toast('Could not save this text (' + ((err && err.code) || (err && err.message) || 'unknown') + '). You can read it now, but it will be gone when you leave.');
@@ -913,7 +924,7 @@ function addParts(idx) {
   return idx.reduce(function (p, i) {
     return p.then(function () {
       if (added[i]) return;
-      var t = { title: partTitle(i), by: meta.by.slice(0, 60), text: parts[i].text, created: now + (n - i), seen: [], n: 0, av: 0 };
+      var t = { title: partTitle(i), by: meta.by.slice(0, 60), text: parts[i].text, ruby: AZ.rubyToString(parts[i].ruby), created: now + (n - i), seen: [], n: 0, av: 0 };
       return createText(t).then(function () { S.texts.unshift(t); added[i] = t; });
     });
   }, Promise.resolve()).then(function () { return true; }, function (err) {
@@ -959,7 +970,7 @@ function openReader(t, an) {
     track.appendChild(bar); wait.appendChild(msg); wait.appendChild(track);
     box.appendChild(wait);
     ENG.onProgress = function (d, tt) { bar.style.width = Math.round(d / tt * 100) + '%'; msg.textContent = progressText(d, tt); };
-    return ENG.analyze(t.text).then(function (fresh) {
+    return ENG.analyze(t.text, AZ.rubyFromString(t.ruby)).then(function (fresh) {
       AN.put(t.id, fresh);
       if (t.av !== fresh.v) {
         /* the looked-up list points at phrases by position, so it is kept only if the phrases did not move */
