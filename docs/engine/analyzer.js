@@ -3,7 +3,7 @@
 (function (root) {
 'use strict';
 
-var VERSION = 4;
+var VERSION = 5;
 var KANJI = /[㐀-䶿一-鿿豈-﫿々〆]/;
 var OPEN = '「『（(〈《【〔［[｛{“‘"\'';
 
@@ -52,10 +52,38 @@ function Dict(lines) {
     line.slice(a + 1, b).split(';').forEach(function (k) { add(k, i); });
   }
   this.idx = idx;
+  this.alt = null;
 }
-Dict.prototype.has = function (key) { return this.idx.has(key); };
+/* Older and looser writing leaves out the kana between kanji: 絶間 for 絶え間, 取扱 for 取り扱い, 申込 for
+   申し込み. Those spellings are looked up under the dictionary's own when nothing else matches; they are
+   built the first time one is needed. */
+var INNER_KANA = new RegExp('(' + KANJI.source + ')[ぁ-ゖ]+(?=' + KANJI.source + ')', 'g');
+var END_KANA = new RegExp('(' + KANJI.source + ')[ぁ-ゖ]+$');
+Dict.prototype.alts = function () {
+  if (this.alt) return this.alt;
+  var alt = new Map(), idx = this.idx, lines = this.lines;
+  function add(key, i) {
+    if (idx.has(key)) return;
+    var v = alt.get(key);
+    if (v === undefined) alt.set(key, [i]); else if (v.indexOf(i) < 0) v.push(i);
+  }
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i], a = line.indexOf('\t');
+    if (a <= 0) continue;
+    var noun = /\tn/.test(line) || /\|n/.test(line);
+    line.slice(0, a).split(';').forEach(function (k) {
+      var inner = k.replace(INNER_KANA, '$1');
+      if (inner !== k) add(inner, i);
+      /* a noun also loses the kana at its end (取扱い → 取扱), only once the inner kana are gone */
+      if (noun && inner !== k && END_KANA.test(inner)) add(inner.replace(END_KANA, '$1'), i);
+    });
+  }
+  return (this.alt = alt);
+};
+Dict.prototype.has = function (key) { return this.idx.has(key) || (hasKanji(key) && this.alts().has(key)); };
 Dict.prototype.entries = function (key) {
-  var v = this.idx.get(key);
+  var v = this.idx.get(key), alt = false;
+  if (v === undefined && hasKanji(key)) { v = this.alts().get(key); alt = true; }
   if (v === undefined) return [];
   var ids = typeof v === 'number' ? [v] : v;
   var lines = this.lines;
@@ -67,7 +95,7 @@ Dict.prototype.entries = function (key) {
       r: p[1].split(';'),
       rank: +flags.charAt(0) || 0,
       uk: flags.indexOf('u') >= 0,
-      old: flags.indexOf('o') >= 0,
+      old: flags.indexOf('o') >= 0, alt: alt,
       senses: (p[3] || '').split('|').map(function (s) { return { c: s.charAt(0), g: s.slice(1) }; }),
     };
   });
@@ -87,6 +115,12 @@ function shortGloss(g) {
 /* Pick the best entry for a key, given what the tokenizer says about the word. */
 Dict.prototype.pick = function (key, cls, reading, inflected, weak) {
   var list = this.entries(key);
+  /* a spelling found only without its kana must be read the way the dictionary reads it */
+  if (list.length && list[0].alt && reading) {
+    list = list.filter(function (e) {
+      return e.r.some(function (r) { return r === reading || (inflected && commonPrefix(r, reading) >= Math.max(1, r.length - 1)); });
+    });
+  }
   if (!list.length) return null;
   var kanaKey = !hasKanji(key);
   var best = null, bestScore = -1e9;
@@ -449,6 +483,8 @@ Engine.prototype.merge = function (toks, i) {
     for (var q = 1; q < n - 1; q++) if (toks[i + q].pos === '助詞') hasParticle = true;
     if (hasParticle && n < 3) continue;
     var key = head + lemma(last);
+    /* a word the dictionary lists in its inflected form is taken as it stands: 絶え間なく "incessantly" */
+    if (last.surface_form !== lemma(last) && last.pos === '形容詞' && dict.has(head + last.surface_form)) key = head + last.surface_form;
     /* a word may not cut a number in two (一二〇 must not yield 一二), and file numbers with 〇 stay as digits */
     if (numRun >= 2 && n < numRun) continue;
     if (numRun && /[〇零]/.test(key)) continue;
@@ -515,6 +551,14 @@ Engine.prototype.paragraph = function (text) {
     /* する after a noun that takes it: 合格 + したら is one word */
     if (K === 'CONTENT' && lemma(t) === 'する' && lastIsWord() && word.kind === 'c' && word.suru) {
       fuse(i, t); word.verbal = true; word.suru = false;
+      continue;
+    }
+
+    /* 云え + ない: the tokenizer's dictionary has no 云える, so "cannot say" comes as an order followed by
+       the adjective ない; the two are one word */
+    if (t.pos === '形容詞' && lemma(t) === 'ない' && lastIsWord() && word.kind === 'c' && word.cls === 'v' && !word.potNeg &&
+        /^命令ｅ/.test(word.toks[word.toks.length - 1].conjugated_form || '')) {
+      fuse(i, t); word.potNeg = true; word.inflected = true;
       continue;
     }
 
@@ -671,6 +715,9 @@ Engine.prototype.paragraph = function (text) {
             if (ph) hit = { en: 'can ' + ph.en.replace(/^to /, '').replace(/, to /g, ', '), reading: '' };
           }
         }
+        /* ない on its own is "not" or "there is none", never the dictionary's other senses of the kana */
+        if (w.key === 'ない' && head.pos === '形容詞') hit = { en: 'not; there is none', reading: '' };
+        if (hit && w.potNeg) hit = { en: 'cannot ' + hit.en.replace(/^to /, '').replace(/, to /g, ', '), reading: hit.reading };
         if (hit) { en = hit.en; rd = hit.reading; }
         else if (head.pos_detail_1 === '固有名詞') {
           en = head.pos_detail_2 === '人名' ? '(a name)' : head.pos_detail_2 === '地域' ? '(a place)' : head.pos_detail_2 === '組織' ? '(an organisation)' : '(a name)';

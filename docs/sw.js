@@ -1,11 +1,12 @@
 /* Yaoki Reader offline copy.
- * The page and its small files are fetched fresh when there is a connection and kept for when there is
- * none, so a change to the page reaches phones without any version to bump. The engine (engine/, about
- * 36 MB) never changes between releases: it is kept the first time it is fetched and served from the
- * phone from then on. If the engine's files are ever replaced, change ENGINE below so phones fetch them again. */
+ * The page and its code (the engine's scripts included) are fetched fresh when there is a connection and
+ * kept for when there is none, so a change reaches phones without any version to bump. The dictionary
+ * (engine/dict/ and engine/jm-*.txt, about 36 MB) is kept the first time it is fetched and served from the
+ * phone from then on. If the dictionary's files are ever replaced, change ENGINE below so phones fetch them again. */
 const HOME = new URL('./', self.location.href).pathname;
 const PREFIX = 'yaoki-reader:' + HOME + ':';
 const SHELL = PREFIX + 'page';
+/* the name dates from when the engine's scripts were kept here too; kept so phones keep the dictionary they have */
 const ENGINE = PREFIX + 'engine-4';
 const FILES = [
   './',
@@ -52,7 +53,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin || !url.pathname.startsWith(HOME)) return;
   const rest = url.pathname.slice(HOME.length);
-  if (rest.startsWith('engine/')) {
+  if (rest.startsWith('engine/dict/') || /^engine\/jm-\d+\.txt$/.test(rest)) {
     event.respondWith(caches.open(ENGINE).then(async (cache) => {
       const kept = await cache.match(request, { ignoreSearch: true });
       if (kept) return kept;

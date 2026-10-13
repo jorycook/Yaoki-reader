@@ -22,9 +22,9 @@ The site is `docs/`, served by GitHub Pages (Settings → Pages → Deploy from 
 | File | What it is |
 |---|---|
 | `docs/index.html` | The whole page: library, add form, Aozora Bunko, reader, settings, backups. |
-| `docs/sw.js` | The offline copy: the page fresh from the network when there is one, the engine kept on the device. If the engine's files are ever replaced, change `ENGINE` in it. |
+| `docs/sw.js` | The offline copy: the page and the engine's scripts fresh from the network when there is one, the dictionary kept on the device. If the dictionary's files are ever replaced, change `ENGINE` in it. |
 | `docs/manifest.webmanifest`, `docs/icons/` | Home-screen name and icons (Yaoki's daruma on the reader's blue, drawn by `tools/icons.mjs`). |
-| `docs/engine/analyzer.js` | Phrases, readings, glosses and grammar notes (analysis version 4). |
+| `docs/engine/analyzer.js` | Phrases, readings, glosses and grammar notes (analysis version 5). Texts analysed by an earlier version are analysed again when next opened. |
 | `docs/engine/kuromoji.js`, `engine/dict/` | kuromoji.js 0.1.2 and the IPA dictionary, its loader changed to read the dictionary as base64 text. |
 | `docs/engine/jm-1.txt`, `jm-2.txt` | A shortened JMdict word list (2020 edition, from the `jamdict-data` 1.5 package). |
 | `docs/engine/worker.js`, `boot.js` | Runs the engine off the page's main thread. |
@@ -46,6 +46,7 @@ Needs Node and Playwright (point `NODE_PATH` at the Playwright install if it is 
 
 ```
 cd check
+node engine-test.js           # the engine alone, in Node: readings and meanings that once went wrong
 bash run.sh reader-test.js    # serves docs/ at /Yaoki-reader/ as GitHub Pages does: sample, adding a text, backups, offline
 bash run.sh aozora-test.js    # Aozora Bunko: search, fetch, parts, a downloaded zip (the copy of Aozora's files is played by the test)
 ```

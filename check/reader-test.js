@@ -108,7 +108,7 @@ async function holdFirstPhrase(page, nth) {
   step('load a backup: one new text, one already here, one empty entry');
   const fixture = await writeBackup([
     saved.texts[0],
-    { title: '短い話', text: '駅の忘れ物センターには、毎日たくさんの傘が届く。', created: saved.texts[0].created + 1000, seen: [0, 2], n: 9, av: 4 },
+    { title: '短い話', text: '駅の忘れ物センターには、毎日たくさんの傘が届く。', created: saved.texts[0].created + 1000, seen: [0, 2], n: 9, av: 5 },
     { title: '空', text: '   ' },
   ]);
   await page.setInputFiles('#import-file', fixture);
