@@ -50,7 +50,7 @@ bash run.sh reader-test.js    # serves docs/ at /Yaoki-reader/ as GitHub Pages d
 bash run.sh aozora-test.js    # Aozora Bunko: search, fetch, parts, a downloaded zip (the copy of Aozora's files is played by the test)
 ```
 
-`BACKUP=<a reader backup file>` with `reader-test.js` also loads that file and opens every text in it. `LIVE=1` with `aozora-test.js` uses the real copy of Aozora's files.
+`BACKUP=<a reader backup file>` with `reader-test.js` also loads that file and opens every text in it.
 
 ## Licences
 

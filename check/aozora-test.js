@@ -2,7 +2,7 @@
 // usage: bash run.sh aozora-test.js
 // The copy of Aozora's files the reader fetches from is answered by the test itself, with made-up texts
 // in Aozora's own format (Shift_JIS, ruby, notes, headings), so no network is needed and no work's text
-// is kept here. LIVE=1 also fetches 蜘蛛の糸 from the real copy (needs a connection the browser can use).
+// is kept here.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -62,7 +62,7 @@ async function search(page, q) {
     '000879/files/92_ruby_164/92_ruby_164.txt': sjis(SHORT),        // 蜘蛛の糸 in the catalog, a made-up text here
     '000148/files/789_ruby_5639/789_ruby_5639.txt': sjis(LONG),     // 吾輩は猫である
   };
-  if (!process.env.LIVE) {
+  {
     await ctx.route(MIRROR + '**', (r) => {
       const key = r.request().url().slice(MIRROR.length);
       asked.push(key);
@@ -174,11 +174,7 @@ async function search(page, q) {
   const by = await page.evaluate(() => JSON.parse(localStorage.getItem('yomu.texts')).map((t) => t.by));
   ok(by.filter((b) => b === '夏目漱石').length === 3 && by.includes('芥川竜之介') && by.includes('別の作者'), 'saved texts keep who wrote them');
 
-  if (process.env.LIVE) {
-    ok(asked.length === 0, 'live run');
-  } else {
-    ok(asked.every((k) => /^\d{6}\/files\/\d+_[a-z]+_\d+\/\d+_[a-z]+_\d+\.txt$/.test(k)), 'only text files in the copy were asked for (' + asked.length + ')');
-  }
+  ok(asked.every((k) => /^\d{6}\/files\/\d+_[a-z]+_\d+\/\d+_[a-z]+_\d+\.txt$/.test(k)), 'only text files in the copy were asked for (' + asked.length + ')');
   ok(logs.length === 0, 'no page errors' + (logs.length ? ': ' + logs.join(' | ') : ''));
   await browser.close();
   console.log(fails ? 'FAILED: ' + fails : 'PASS');
