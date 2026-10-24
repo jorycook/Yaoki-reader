@@ -38,6 +38,10 @@ ${'<p>駅の前に小さな本屋があって、私は毎朝そこで新聞を�
   'shadow.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><title>shadow</title>
 <body style="margin:0;padding:120px 30px;font:20px/1.8 serif"><div id="h"></div>
 <script>document.getElementById('h').attachShadow({mode:'open'}).innerHTML = '<p id="s">猫が窓の外を見ている。</p>';</script></body></html>`,
+  'cover.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><title>cover</title>
+<body style="margin:0;padding:300px 30px;font:20px/1.8 sans-serif">
+<div id="card" style="position:relative;padding:10px;border:1px solid #ccc"><h2 id="story" style="font-size:20px;margin:0">駅前の本屋が来月で閉店する</h2>
+<a href="${SITE}next.html" style="position:absolute;inset:0" aria-label="story"></a></div></body></html>`,
   'desktop.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><title>desktop</title>
 <body style="margin:0;padding:200px 30px;width:960px;font:16px/1.7 sans-serif"><p id="d">駅前の喫茶店で友達と待ち合わせをした。</p></body></html>`,
 };
@@ -84,6 +88,7 @@ async function main() {
           radius: cs.borderTopLeftRadius, transform: card.style.transform,
           readings: Array.from(this.querySelectorAll('.rd')).map((e) => { const b = e.getBoundingClientRect(); return { text: e.textContent, left: b.left, top: b.top, right: b.right, bottom: b.bottom, vertical: e.classList.contains('v') }; }),
           marks: this.querySelectorAll('.mark').length,
+          fills: this.querySelectorAll('.mark.fill').length,
         };
       }`,
     });
@@ -265,7 +270,19 @@ async function main() {
   ok(L && /rain/.test(L.card), 'a word in vertical text is found: ' + (L && L.card));
   const vr = L && L.readings.find((r) => r.text === 'あめ');
   ok(vr && vr.vertical && vr.left >= p.right - 2, 'its reading runs down the right of the kanji');
+  ok(L && L.fills > 0, 'and the phrase is marked with boxes of the extension\'s own (the browser\'s marking is wrong in vertical text)');
   await lift();
+
+  step('text under an empty link laid over a story card');
+  await page.goto(SITE + 'cover.html');
+  p = await at('#story', '閉');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /閉店/.test(l.card) && l; }, 5000);
+  ok(L && /closing|clos/.test(L.card), 'the word under the cover is found: ' + (L && L.card));
+  ok(await page.evaluate(() => { const a = document.querySelector('#card a'); return a.style.pointerEvents === '' && getComputedStyle(a).pointerEvents === 'auto'; }), 'the cover is put back as it was');
+  await lift();
+  await wait(400);
+  ok(page.url() === SITE + 'cover.html', 'letting go does not follow the covering link');
 
   step('Chinese is left alone');
   await page.goto(SITE + 'chinese.html');

@@ -238,9 +238,13 @@ function rangeOf(g, from, to) {
    there is no Japanese under the point. */
 function spotAt(x, y, slop) {
   var hit = caretAt(x, y);
-  if (!hit || (host && host.contains(hit.node))) return null;
-  var i = charUnder(hit, x, y, slop);
-  if (i < 0) return null;
+  var i = hit ? charUnder(hit, x, y, slop) : -1;
+  if (i < 0) {
+    var under = underCover(x, y, slop);
+    if (!under) return null;
+    hit = under.hit; i = under.i;
+  }
+  if (host && host.contains(hit.node)) return null;
   var s = hit.node.data;
   if (!JA.test(s.substr(i, charLen(s, i)))) return null;
   var el = hit.node.parentNode;
@@ -258,6 +262,33 @@ function spotAt(x, y, slop) {
   var ruby = g.ruby.filter(function (r) { return r[0] >= span[0] && r[0] + r[1] <= span[1]; })
     .map(function (r) { return [r[0] - span[0], r[1], r[2]]; });
   return { g: g, from: span[0], text: text, ruby: ruby, at: g.index - span[0], el: el };
+}
+/* Some pages lay an empty link or layer over a whole block of text (a news site's story card that is one big link):
+   the text under it is looked for again with the cover let through for a moment, then put back as it was. */
+function underCover(x, y, slop) {
+  if (!document.elementsFromPoint) return null;
+  var stack = document.elementsFromPoint(x, y), undo = [], found = null;
+  try {
+    for (var k = 0; k < stack.length && k < 3 && !found; k++) {
+      var e = stack[k];
+      if (e === host || e === document.body || e === document.documentElement || hasText(e)) break;
+      undo.push([e, e.style.getPropertyValue('pointer-events'), e.style.getPropertyPriority('pointer-events')]);
+      e.style.setProperty('pointer-events', 'none', 'important');
+      var hit = caretAt(x, y), i = hit ? charUnder(hit, x, y, slop) : -1;
+      if (i >= 0) found = { hit: hit, i: i };
+    }
+  } finally {
+    undo.forEach(function (u) {
+      if (u[1]) u[0].style.setProperty('pointer-events', u[1], u[2]); else u[0].style.removeProperty('pointer-events');
+    });
+  }
+  return found;
+}
+/* whether an element shows any text at all (a cover shows none) */
+function hasText(e) {
+  var w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT), n;
+  while ((n = w.nextNode())) if (/\S/.test(n.data)) return true;
+  return false;
 }
 var japanesePage = false, lookedAt = 0;
 function pageIsJapanese() {
@@ -493,6 +524,8 @@ function clearMarks() {
   if (highlight) { try { CSS_HL.delete('yaoki-reader'); } catch (err) { /* gone already */ } highlight = null; }
 }
 var CSS_HL = window.CSS && window.CSS.highlights && typeof Highlight === 'function' ? window.CSS.highlights : null;
+/* Safari, and every browser on iPhone and iPad, which all use Safari's engine */
+var WEBKIT = /Apple/.test(navigator.vendor || '');
 function rectsOf(range) { return Array.prototype.filter.call(range.getClientRects(), function (r) { return r.width > 0 && r.height > 0; }); }
 function union(rects) {
   var u = null;
@@ -535,7 +568,11 @@ function markPhrase(spot, ph) {
     var r = spot.el && spot.el.getBoundingClientRect ? spot.el.getBoundingClientRect() : { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
     return { box: { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }, room: 0 };
   }
-  if (CSS_HL) {
+  var room = 0, upright = !vertical(range.startContainer);
+  /* The browser marks the text itself where it can; boxes of our own are drawn over it where it cannot: Safari does
+     not mark text that cannot be selected (held text cannot be), Firefox and Safari do not reach into a web
+     component, and Chrome gets vertical text wrong. */
+  if (CSS_HL && !WEBKIT && upright && range.startContainer.getRootNode() === document) {
     try { highlight = new Highlight(range); CSS_HL.set('yaoki-reader', highlight); } catch (err) { highlight = null; }
   }
   rects.forEach(function (r) {
@@ -543,7 +580,6 @@ function markPhrase(spot, ph) {
     m.style.left = r.left + 'px'; m.style.top = r.top + 'px'; m.style.width = r.width + 'px'; m.style.height = r.height + 'px';
     layer.marks.appendChild(m);
   });
-  var room = 0, upright = !vertical(range.startContainer);
   if (S.furigana) {
     var px = parseFloat(getComputedStyle(range.startContainer.parentNode).fontSize) || 16;
     var size = Math.max(9 * view().k, Math.min(px * 0.55, 22));
