@@ -49,16 +49,18 @@ api.tabs.query({ active: true, currentWindow: true }).then(function (tabs) {
   $('site-ds').textContent = 'Not running on this page. Reload it if it was open before Yaoki Reader was installed or updated; browser pages and add-on stores are closed to extensions.';
 });
 
+/* changed only when it says something new, so a screen reader announces each change once */
+function say(node, text) { if (node.textContent !== text) node.textContent = text; }
 function showState(st) {
   var text = $('state-text'), track = $('state-track'), box = $('state');
   box.classList.toggle('problem', st.state === 'failed');
   track.hidden = st.state !== 'loading';
-  if (st.state === 'ready') text.textContent = 'Dictionary: ready.';
+  if (st.state === 'ready') say(text, 'Dictionary: ready.');
   else if (st.state === 'loading') {
-    text.textContent = 'Dictionary: loading…';
+    say(text, 'Dictionary: loading…');
     $('state-bar').style.width = Math.round(100 * (st.done || 0) / (st.total || 17)) + '%';
-  } else if (st.state === 'failed') text.textContent = 'Dictionary: could not be loaded (' + (st.error || 'unknown error') + '). It is tried again at the next touch.';
-  else text.textContent = 'Dictionary: loads the first time you touch a word, or when a Japanese page opens (a few seconds).';
+  } else if (st.state === 'failed') say(text, 'Dictionary: could not be loaded (' + (st.error || 'unknown error') + '). It is tried again at the next touch.');
+  else say(text, 'Dictionary: loads the first time you touch a word, or when a Japanese page opens (a few seconds).');
 }
 function poll() {
   api.runtime.sendMessage({ type: 'yaoki:status' }).then(function (st) {

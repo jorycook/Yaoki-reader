@@ -4,7 +4,9 @@
    Safari it runs in the background page itself, next to background.js. */
 (function (root) {
 'use strict';
-var worker = null, state = 'idle', done = 0, total = 17, error = '', nextId = 1;
+var worker = null, state = 'idle', done = 0, total = 17, error = '', nextId = 1, failedAt = 0;
+/* after a failed load, lookups are told so for a while rather than starting it again at once (and again, in a loop) */
+var RETRY = 10000;
 var waiting = new Map();
 /* the engine holds about 200 MB: after half an hour without a lookup it is let go, and loaded again when needed */
 var IDLE = 30 * 60 * 1000, idleTimer = 0;
@@ -40,7 +42,7 @@ function start() {
 }
 /* a failed load is tried again at the next lookup */
 function fail(message) {
-  state = 'failed'; error = String(message || 'unknown error');
+  state = 'failed'; error = String(message || 'unknown error'); failedAt = Date.now();
   if (worker) worker.terminate();
   worker = null;
   waiting.forEach(function (cb) { cb({ type: 'fail', message: error }); });
@@ -60,14 +62,18 @@ function analyze(text, ruby) {
 function handle(msg) {
   var type = msg && msg.type;
   if (type === 'yaoki:status') return Promise.resolve(status());
-  if (type === 'yaoki:warm') { if (state !== 'ready') start(); used(); return Promise.resolve(status()); }
+  if (type === 'yaoki:warm') {
+    if (state === 'idle' || (state === 'failed' && Date.now() - failedAt >= RETRY)) start();
+    used();
+    return Promise.resolve(status());
+  }
   if (type === 'yaoki:analyze') {
     used();
     if (typeof msg.text !== 'string' || msg.text.length > 4000) return Promise.resolve({ error: 'nothing to look up' });
     if (state !== 'ready') {
-      if (state === 'failed') worker = null;
+      if (state === 'failed' && Date.now() - failedAt < RETRY) return Promise.resolve({ error: 'the dictionary could not be loaded (' + error + ')' });
       start();
-      if (state === 'failed') return Promise.resolve({ error: error });
+      if (state === 'failed') return Promise.resolve({ error: 'the dictionary could not be loaded (' + error + ')' });
       return Promise.resolve({ wait: status() });
     }
     return analyze(msg.text, Array.isArray(msg.ruby) ? msg.ruby : []);

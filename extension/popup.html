@@ -72,20 +72,20 @@ h2 [lang="ja"] { color: var(--ink); }
     <div class="brand">Yaoki Reader <small>Readings and meanings at a touch</small></div>
   </div>
 
-  <button class="switch" type="button" role="switch" id="sw-on" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">オン</span> <small>On</small></span><span class="ds">On every site, unless you switch it off for one below.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
-  <button class="switch" type="button" role="switch" id="sw-site" aria-checked="true" disabled><span class="txt"><span class="nm" id="site-name">This site</span><span class="ds" id="site-ds">Open a web page to switch Yaoki Reader off for its site.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <button class="switch" type="button" role="switch" id="sw-on" aria-checked="true" aria-labelledby="sw-on-nm" aria-describedby="sw-on-ds"><span class="txt"><span class="nm" id="sw-on-nm"><span lang="ja">オン</span> <small>On</small></span><span class="ds" id="sw-on-ds">On every site, unless you switch it off for one below.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <button class="switch" type="button" role="switch" id="sw-site" aria-checked="true" disabled aria-labelledby="site-name" aria-describedby="site-ds"><span class="txt"><span class="nm" id="site-name">This site</span><span class="ds" id="site-ds">Open a web page to switch Yaoki Reader off for its site.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
 
   <div class="how">
     <p><b>Touch a Japanese word and keep your finger on it.</b> Its reading shows over the kanji and a card shows what each word means. Slide to the next word; lift your finger and it hides again.</p>
     <p><b>With a mouse:</b> hold the button down on a word, or hold <b>Shift</b> and point.</p>
   </div>
 
-  <div class="state" id="state"><span id="state-text">Dictionary: checking…</span><span class="track" id="state-track" hidden><i id="state-bar"></i></span></div>
+  <div class="state" id="state"><span id="state-text" role="status">Dictionary: checking…</span><span class="track" id="state-track" hidden><i id="state-bar"></i></span></div>
 
   <h2><span lang="ja">触れたときに出すもの</span> · What a touch shows</h2>
-  <button class="switch" type="button" role="switch" id="sw-furigana" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">ふりがな</span> <small>Furigana</small></span><span class="ds">Readings above the kanji, in the page and in the card.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
-  <button class="switch" type="button" role="switch" id="sw-meanings" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">語の意味</span> <small>Word meanings</small></span><span class="ds">English under each word. Particles are left untranslated.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
-  <button class="switch" type="button" role="switch" id="sw-grammar" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">文法メモ</span> <small>Grammar note</small></span><span class="ds">The pattern inside the phrase, such as 〜ながら.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <button class="switch" type="button" role="switch" id="sw-furigana" aria-checked="true" aria-labelledby="sw-furigana-nm" aria-describedby="sw-furigana-ds"><span class="txt"><span class="nm" id="sw-furigana-nm"><span lang="ja">ふりがな</span> <small>Furigana</small></span><span class="ds" id="sw-furigana-ds">Readings above the kanji, in the page and in the card.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <button class="switch" type="button" role="switch" id="sw-meanings" aria-checked="true" aria-labelledby="sw-meanings-nm" aria-describedby="sw-meanings-ds"><span class="txt"><span class="nm" id="sw-meanings-nm"><span lang="ja">語の意味</span> <small>Word meanings</small></span><span class="ds" id="sw-meanings-ds">English under each word. Particles are left untranslated.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <button class="switch" type="button" role="switch" id="sw-grammar" aria-checked="true" aria-labelledby="sw-grammar-nm" aria-describedby="sw-grammar-ds"><span class="txt"><span class="nm" id="sw-grammar-nm"><span lang="ja">文法メモ</span> <small>Grammar note</small></span><span class="ds" id="sw-grammar-ds">The pattern inside the phrase, such as 〜ながら.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
 
   <h2 id="hold-h"><span lang="ja">長押しの長さ</span> · How long to hold</h2>
   <div class="seg" role="group" aria-labelledby="hold-h">

@@ -52,6 +52,13 @@ api.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (sender && sender.id && sender.id !== api.runtime.id) return false;
   /* a ping that finds the page reopened (Safari closed it anyway, short of memory) starts loading the engine again */
   if (msg.type === 'yaoki:ping') msg = { type: 'yaoki:warm' };
+  /* the panel asking how far the engine has got does not open Chrome's offscreen document by itself */
+  if (msg.type === 'yaoki:status' && !self.YaokiHost) {
+    hasHost().then(function (has) {
+      return has ? toHost(msg) : { state: 'idle', done: 0, total: 17, error: '' };
+    }).then(sendResponse, function (err) { sendResponse({ error: String((err && err.message) || err) }); });
+    return true;
+  }
   toHost(msg).then(function (res) {
     if (closesWhenIdle && res && typeof res === 'object') res.keep = true;
     sendResponse(res);

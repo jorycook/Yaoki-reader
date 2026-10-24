@@ -37,11 +37,26 @@ ${'<p>駅の前に小さな本屋があって、私は毎朝そこで新聞を�
 <body style="margin:0;padding:120px 30px;font:20px/1.8 serif"><p id="zh">我们今天去图书馆学习中文。</p></body></html>`,
   'shadow.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><title>shadow</title>
 <body style="margin:0;padding:120px 30px;font:20px/1.8 serif"><div id="h"></div>
-<script>document.getElementById('h').attachShadow({mode:'open'}).innerHTML = '<p id="s">猫が窓の外を見ている。</p>';</script></body></html>`,
+<div id="h2"></div>
+<script>document.getElementById('h').attachShadow({mode:'open'}).innerHTML = '<p id="s">猫が窓の外を見ている。</p>';
+document.getElementById('h2').attachShadow({mode:'open'}).innerHTML = '犬が<b>庭の隅</b>で寝ている。';</script></body></html>`,
   'cover.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><title>cover</title>
 <body style="margin:0;padding:300px 30px;font:20px/1.8 sans-serif">
 <div id="card" style="position:relative;padding:10px;border:1px solid #ccc"><h2 id="story" style="font-size:20px;margin:0">駅前の本屋が来月で閉店する</h2>
 <a href="${SITE}next.html" style="position:absolute;inset:0" aria-label="story"></a></div></body></html>`,
+  'more.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><title>more</title>
+<style>::backdrop { background: rgba(0, 0, 0, 0.6); } .card2 { position: relative } .card2 a::after { content: ''; position: absolute; inset: 0 }</style>
+<body style="margin:0;padding:300px 30px 30px;font:20px/1.8 serif;width:600px">
+<p id="rt">その<ruby>蜘蛛<rt>くも</rt></ruby>を助けた。</p>
+<p id="rb"><ruby><rb>東</rb><rb>京</rb><rt>とう</rt><rt>きょう</rt></ruby>へ行く。</p>
+<ul id="list"><li>続きを読む</li><li>続きを読む</li></ul>
+<div class="card2" id="card2"><h3 style="margin:0"><a href="${SITE}next.html">新しい記事の見出し</a></h3><p id="teaser" style="margin:0">本文の一部がここに入る。</p></div>
+<p id="swap">雨の日は家で本を読む。</p>
+<p><button id="next" onclick="this.dataset.n = (+this.dataset.n || 0) + 1">次へ</button></p>
+${'<p>駅の前に小さな本屋があって、私は毎朝そこで新聞を買う。</p>'.repeat(30)}
+</body></html>`,
+  'xhtml.xhtml': `<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" lang="ja"><head><title>x</title></head>
+<body style="margin:0;padding:300px 30px;font:20px/1.8 serif"><div id="x">一行目の文章です<br/>二行目の文章です<br/>三行目</div></body></html>`,
   'desktop.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><title>desktop</title>
 <body style="margin:0;padding:200px 30px;width:960px;font:16px/1.7 sans-serif"><p id="d">駅前の喫茶店で友達と待ち合わせをした。</p></body></html>`,
 };
@@ -56,7 +71,7 @@ async function main() {
   await ctx.route(/^http:\/\/yaoki\.test\//, (route) => {
     const name = new URL(route.request().url()).pathname.slice(1) || 'plain.html';
     if (!PAGES[name]) return route.fulfill({ status: 404, body: 'none' });
-    const headers = { 'content-type': name.endsWith('.css') ? 'text/css' : 'text/html; charset=utf-8' };
+    const headers = { 'content-type': name.endsWith('.css') ? 'text/css' : name.endsWith('.xhtml') ? 'application/xhtml+xml; charset=utf-8' : 'text/html; charset=utf-8' };
     /* a page that allows no inline styles or scripts of its own, as many sites do */
     if (name === 'strict.html') headers['content-security-policy'] = "default-src 'none'; style-src 'self'; script-src 'self'";
     return route.fulfill({ status: 200, headers, body: PAGES[name] });
@@ -72,7 +87,7 @@ async function main() {
   async function layer() {
     const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
     let host = null;
-    (function find(n) { if (host || !n) return; if (n.nodeName === 'YAOKI-READER-LAYER') host = n; (n.children || []).forEach(find); })(doc.root);
+    (function find(n) { if (host || !n) return; if (n.nodeName.toUpperCase() === 'YAOKI-READER-LAYER') host = n; (n.children || []).forEach(find); })(doc.root);
     if (!host || !host.shadowRoots || !host.shadowRoots.length) return { card: '', shown: false, readings: [], marks: 0 };
     const { object } = await cdp.send('DOM.resolveNode', { nodeId: host.shadowRoots[0].nodeId });
     const { result } = await cdp.send('Runtime.callFunctionOn', {
@@ -88,6 +103,8 @@ async function main() {
           radius: cs.borderTopLeftRadius, transform: card.style.transform,
           readings: Array.from(this.querySelectorAll('.rd')).map((e) => { const b = e.getBoundingClientRect(); return { text: e.textContent, left: b.left, top: b.top, right: b.right, bottom: b.bottom, vertical: e.classList.contains('v') }; }),
           marks: this.querySelectorAll('.mark').length,
+          markTop: (this.querySelector('.mark') || { getBoundingClientRect: () => ({ top: -1 }) }).getBoundingClientRect().top,
+          inTopLayer: this.host.matches(':popover-open'),
           fills: this.querySelectorAll('.mark.fill').length,
         };
       }`,
@@ -97,7 +114,7 @@ async function main() {
   /* where a character of an element's text is on screen */
   async function at(sel, text, nth) {
     return page.evaluate(([sel, text, nth]) => {
-      const root = document.querySelector(sel) || document.querySelector('#h').shadowRoot.querySelector(sel);
+      const root = sel[0] === '@' ? document.querySelector(sel.slice(1)).shadowRoot : document.querySelector(sel) || document.querySelector('#h').shadowRoot.querySelector(sel);
       const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       let n, seen = 0;
       while ((n = w.nextNode())) {
@@ -124,13 +141,26 @@ async function main() {
     return v;
   }
 
+  step('switched off, a Japanese page loads nothing');
+  const contexts = () => sw.evaluate(() => chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] }).then((c) => c.length));
+  await sw.evaluate(() => chrome.storage.local.set({ settings: { on: false, off: [], furigana: true, meanings: true, grammar: true, hold: 1 } }));
+  await page.goto(SITE + 'plain.html');
+  await wait(3500);
+  ok(await contexts() === 0, 'with Yaoki Reader off, opening a Japanese page does not start the engine');
+  const panel0 = await ctx.newPage();
+  await panel0.goto('chrome-extension://' + extId + '/popup.html');
+  await wait(1500);
+  ok(await contexts() === 0, 'nor does opening the toolbar panel');
+  await panel0.close();
+
   step('a Japanese page wakes the engine before the first touch');
+  await sw.evaluate(() => chrome.storage.local.set({ settings: { on: true, off: [], furigana: true, meanings: true, grammar: true, hold: 1 } }));
   await page.goto(SITE + 'plain.html');
   const ready = await until(async () => (await sw.evaluate(() => toHost({ type: 'yaoki:status' }))).state === 'ready', 40000);
   ok(ready, 'the dictionary is loaded in the background after the page opens');
 
   step('a finger held on a word');
-  let p = await at('#weather', '天');
+  let p = await at('#weather', '天'), q;
   await hold(p);
   let L = await until(async () => { const l = await layer(); return l.shown && /天気/.test(l.card) && l; }, 5000);
   ok(L && /fine weather/.test(L.card), 'the card shows 天気 and "fine weather": ' + (L && L.card));
@@ -144,7 +174,7 @@ async function main() {
 
   step('sliding the finger to the next phrase');
   const scrollBefore = await page.evaluate(() => scrollY);
-  const q = await at('#weather', '明');
+  q = await at('#weather', '明');
   for (let k = 1; k <= 6; k++) await touch('touchMove', { x: p.x + (q.x - p.x) * k / 6, y: p.y + (q.y - p.y) * k / 6 });
   L = await until(async () => { const l = await layer(); return l.shown && /明日/.test(l.card) && l; }, 5000);
   ok(L && /tomorrow/.test(L.card), 'the card follows to 明日 "tomorrow": ' + (L && L.card));
@@ -153,6 +183,7 @@ async function main() {
   await lift();
   L = await layer();
   ok(!L.shown && L.readings.length === 0 && L.marks === 0, 'lifting the finger hides the card, the reading and the mark');
+  ok(!L.inTopLayer, 'and the layer leaves the top layer');
 
   step('a grammar pattern');
   p = await at('#weather', '行');
@@ -284,6 +315,71 @@ async function main() {
   await wait(400);
   ok(page.url() === SITE + 'cover.html', 'letting go does not follow the covering link');
 
+  step('the page\'s own furigana: a finger on one, and readings paired base by base');
+  await page.goto(SITE + 'more.html');
+  p = await at('#rt', 'も');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /蜘蛛/.test(l.card) && l; }, 5000);
+  ok(L && /spider/.test(L.card) && !/くも/.test(L.card.replace(/\s/g, '')), 'a finger on the reading くも shows the word under it, 蜘蛛, not くも as a word: ' + (L && L.card));
+  await lift();
+  p = await at('#rb', '京');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /東京/.test(l.card) && l; }, 5000);
+  ok(L && L.cardReadings.join('') === 'とうきょう', 'rb/rt ruby gives 東京 the reading とうきょう: ' + JSON.stringify(L && L.cardReadings));
+  await lift();
+
+  step('the same words on two lines, and an element replaced while held');
+  p = await at('#list', '読', 0);
+  q = await at('#list', '読', 1);
+  await page.mouse.move(p.x, p.y); await page.mouse.down(); await wait(600);
+  L = await until(async () => { const l = await layer(); return l.shown && /読/.test(l.card) && l; }, 5000);
+  const firstTop = L && L.markTop;
+  for (let k = 1; k <= 6; k++) { await page.mouse.move(p.x, p.y + (q.y - p.y) * k / 6); await wait(30); }
+  L = await until(async () => { const l = await layer(); return l.shown && Math.abs(l.markTop - firstTop) > 10 && l; }, 3000);
+  ok(L && Math.abs(L.markTop - (q.top)) < 12, 'moving to the second 続きを読む moves the mark to it');
+  await page.mouse.up(); await wait(100);
+  await page.evaluate(() => document.getElementById('next').dataset.n = '0');
+  const nb = await page.locator('#next').boundingBox();
+  await page.mouse.click(nb.x + nb.width / 2, nb.y + nb.height / 2);
+  ok(await page.evaluate(() => document.getElementById('next').dataset.n) === '1', 'a click on a button just after a hold still counts');
+  p = await at('#swap', '雨');
+  await hold(p);
+  await until(async () => (await layer()).shown, 5000);
+  await page.evaluate(() => { const e = document.getElementById('swap'); e.replaceWith(e.cloneNode(true)); });
+  await lift();
+  ok(!(await layer()).shown, 'when the page replaces the held text, lifting the finger still hides the card');
+  const before2 = await page.evaluate(() => scrollY);
+  p = await at('#swap', '本');
+  await touch('touchStart', p);
+  for (let k = 1; k <= 8; k++) { await touch('touchMove', { x: p.x, y: p.y - 30 * k }); await wait(16); }
+  await touch('touchEnd'); await wait(400);
+  ok(await page.evaluate(() => scrollY) > before2 + 50, 'and the next swipe scrolls');
+  await page.evaluate(() => scrollTo(0, 0)); await wait(200);
+
+  step('a story card that is one big link, and a page that dims its dialogs\' backdrop');
+  p = await at('#card2', '見');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /見出し/.test(l.card) && l; }, 5000);
+  ok(L && /headline/.test(L.card), 'the headline under the link\'s ::after cover is found: ' + (L && L.card));
+  await lift();
+  p = await at('#teaser', '部');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /一部/.test(l.card) && l; }, 5000);
+  ok(L && /part/.test(L.card), 'and so is the teaser under it: ' + (L && L.card));
+  await lift();
+  await wait(300);
+  ok(page.url() === SITE + 'more.html', 'letting go does not follow the card\'s link');
+  const after = await page.evaluate(() => getComputedStyle(document.querySelector('yaoki-reader-layer'), '::backdrop').display);
+  ok(after === 'none', 'the page\'s ::backdrop rule does not reach the layer (' + after + ')');
+
+  step('XHTML: a <br/> still ends the line');
+  await page.goto(SITE + 'xhtml.xhtml');
+  p = await at('#x', '二');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /二/.test(l.card) && l; }, 5000);
+  ok(L && !/です二|目三/.test(L.card.replace(/\s/g, '')), 'the line after <br/> is read on its own: ' + (L && L.card));
+  await lift();
+
   step('Chinese is left alone');
   await page.goto(SITE + 'chinese.html');
   p = await at('#zh', '图');
@@ -297,6 +393,16 @@ async function main() {
   await hold(p);
   L = await until(async () => { const l = await layer(); return l.shown && /窓/.test(l.card) && l; }, 5000);
   ok(L && /window/.test(L.card), 'a word in an open shadow root is found: ' + (L && L.card));
+  await lift();
+  p = await at('@#h2', '犬');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /犬/.test(l.card) && l; }, 5000);
+  ok(L && /dog/.test(L.card), 'text straight in a shadow root is found: ' + (L && L.card));
+  await lift();
+  p = await at('@#h2', '隅');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /隅/.test(l.card) && l; }, 5000);
+  ok(L && /corner|nook/.test(L.card), 'and a word in an inline element there, read with its sentence: ' + (L && L.card));
   await lift();
 
   step('a desktop page shrunk to fit a phone: the card stays readable');
