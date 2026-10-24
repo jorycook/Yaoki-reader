@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Builds the browser extension (extension/) with the reader's engine (docs/engine/) into dist/.
+
+usage: python3 tools/extension.py
+
+The extension's own files are in extension/; the engine and its dictionary are the reader's, copied in at build
+time so there is one copy of them in the repository. Each browser gets a folder and a zip:
+  dist/chrome/   dist/yaoki-reader-chrome.zip    Chrome, Edge and other Chromium browsers (Load unpacked, or the zip
+                                                 for the Chrome Web Store and Edge Add-ons)
+  dist/firefox/  dist/yaoki-reader-firefox.zip   Firefox and Firefox for Android (about:debugging, or the zip for
+                                                 addons.mozilla.org, which signs it)
+  dist/safari/   dist/yaoki-reader-safari.zip    Safari on a Mac, iPhone and iPad, made into an app by Xcode
+                                                 (xcrun safari-web-extension-packager dist/safari) or by the
+                                                 Safari Web Extension Packager in App Store Connect (the zip)
+They differ in their manifest and in where the engine is kept running, since it takes seconds to load:
+  Chrome: the background is a service worker, which cannot hold it; it runs in an offscreen document (host.html),
+          which stays open.
+  Firefox: Manifest V2, whose background page can stay loaded (Firefox closes a Manifest V3 one after 30 s idle).
+  Safari: a background page that is not persistent (the only kind iPhone allows); pages with Japanese on them keep
+          it awake while they are open (content.js), and Safari before 18.4 needs its scripts marked as UTF-8.
+"""
+import json
+import os
+import shutil
+import zipfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+TOP = os.path.join(HERE, '..')
+SRC = os.path.join(TOP, 'extension')
+ENGINE = os.path.join(TOP, 'docs', 'engine')
+DIST = os.path.join(TOP, 'dist')
+GECKO_ID = 'yaoki-reader@jorycook.github.io'
+
+# the engine's files: worker.js loads the scripts beside it, and they load the dictionary from beside them
+ENGINE_FILES = ['worker.js', 'kuromoji.js', 'analyzer.js', 'boot.js', 'jm-1.txt', 'jm-2.txt', 'jm-3.txt', 'kanji.txt']
+COMMON = ['background.js', 'host.js', 'content.js', 'content.css', 'popup.html', 'popup.js', 'icons']
+CHROME_ONLY = ['host.html', 'host-offscreen.js']
+
+
+def chrome(m):
+    return m
+
+
+def firefox(m):
+    m = dict(m)
+    m['manifest_version'] = 2
+    m['background'] = {'scripts': ['host.js', 'background.js'], 'persistent': True}
+    m['browser_action'] = m.pop('action')
+    m['permissions'] = [p for p in m['permissions'] if p != 'offscreen']
+    m.pop('minimum_chrome_version', None)
+    m['browser_specific_settings'] = {
+        'gecko': {
+            'id': GECKO_ID,
+            'strict_min_version': '140.0',
+            # nothing a page holds or a user does is collected or sent anywhere
+            'data_collection_permissions': {'required': ['none']},
+        },
+        'gecko_android': {'strict_min_version': '142.0'},
+    }
+    return m
+
+
+def safari(m):
+    m = dict(m)
+    m['background'] = {'scripts': ['host.js', 'background.js'], 'persistent': False}
+    m['permissions'] = [p for p in m['permissions'] if p != 'offscreen']
+    m.pop('minimum_chrome_version', None)
+    return m
+
+
+# name, manifest, the offscreen document's files, a byte order mark on scripts
+TARGETS = [('chrome', chrome, True, False), ('firefox', firefox, False, False), ('safari', safari, False, True)]
+
+
+def copy(src, dst):
+    if os.path.isdir(src):
+        shutil.copytree(src, dst)
+    else:
+        shutil.copy2(src, dst)
+
+
+def mark_utf8(folder):
+    for base, dirs, files in os.walk(folder):
+        for f in files:
+            if f.endswith('.js'):
+                full = os.path.join(base, f)
+                with open(full, 'rb') as fh:
+                    data = fh.read()
+                if not data.startswith(b'\xef\xbb\xbf'):
+                    with open(full, 'wb') as fh:
+                        fh.write(b'\xef\xbb\xbf' + data)
+
+
+def build(name, shape, offscreen, bom):
+    out = os.path.join(DIST, name)
+    if os.path.exists(out):
+        shutil.rmtree(out)
+    os.makedirs(out)
+    with open(os.path.join(SRC, 'manifest.json'), encoding='utf-8') as f:
+        manifest = shape(json.load(f))
+    with open(os.path.join(out, 'manifest.json'), 'w', encoding='utf-8') as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+    for item in COMMON + (CHROME_ONLY if offscreen else []):
+        copy(os.path.join(SRC, item), os.path.join(out, item))
+    os.makedirs(os.path.join(out, 'engine'))
+    for item in ENGINE_FILES:
+        copy(os.path.join(ENGINE, item), os.path.join(out, 'engine', item))
+    copy(os.path.join(ENGINE, 'dict'), os.path.join(out, 'engine', 'dict'))
+    copy(os.path.join(TOP, 'docs', 'licenses.txt'), os.path.join(out, 'licenses.txt'))
+    if bom:
+        mark_utf8(out)
+    return out, manifest['version']
+
+
+def pack(folder, zip_path):
+    if os.path.exists(zip_path):
+        os.remove(zip_path)
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for base, dirs, files in os.walk(folder):
+            dirs.sort()
+            for f in sorted(files):
+                full = os.path.join(base, f)
+                z.write(full, os.path.relpath(full, folder))
+
+
+def main():
+    os.makedirs(DIST, exist_ok=True)
+    for name, shape, offscreen, bom in TARGETS:
+        folder, version = build(name, shape, offscreen, bom)
+        zip_path = os.path.join(DIST, 'yaoki-reader-%s.zip' % name)
+        pack(folder, zip_path)
+        print('dist/%s/  dist/%s (%.1f MB)  version %s' % (name, os.path.basename(zip_path), os.path.getsize(zip_path) / 1e6, version))
+
+
+if __name__ == '__main__':
+    main()

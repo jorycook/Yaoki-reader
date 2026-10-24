@@ -36,3 +36,10 @@ await png('icon-512.png', 512, 0.7);
 await png('icon-512-maskable.png', 512, 0.56);
 await png('favicon-32.png', 32, 0.82);
 console.log('icons written to', OUT);
+/* the browser extension's (extension/icons/): toolbar and add-on list; small ones fill more of the square */
+const EXT = path.join(HERE, '..', 'extension', 'icons');
+fs.mkdirSync(EXT, { recursive: true });
+for (const [size, share] of [[16, 0.86], [32, 0.82], [48, 0.78], [128, 0.72]]) {
+  fs.writeFileSync(path.join(EXT, `icon-${size}.png`), await sharp(Buffer.from(icon(1024, share))).resize(size, size).png({ compressionLevel: 9 }).toBuffer());
+}
+console.log('extension icons written to', EXT);

@@ -1,0 +1,5 @@
+/* The held phrase, marked in the page's own text (where the browser can mark text without changing the page). */
+::highlight(yaoki-reader) { background-color: #FFE9B0; color: #1B2440; }
+/* While a word is held, or may be about to be (a finger is on it), the page's own long-press (text selection, the
+   link menu) stays out of the way: on the whole page during a hold, on the touched element before it. */
+[data-yaoki-hold], [data-yaoki-hold] * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }

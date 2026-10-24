@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yaoki Reader</title>
+<style>
+/* The toolbar button's panel, in the reader's look: Yaoki stamp-card stationery, light and dark. */
+:root {
+  --ground: #F4F5F9; --card: #FFFFFF; --ink: #1B2440; --muted: #5A6382;
+  --line: #DDE1EC; --line-strong: #C9D0E3; --outline: #1B2440; --hard: #1B2440;
+  --accent: #2F4FD0; --accent-ink: #2F4FD0; --accent-soft: #E8ECFB; --on-accent: #FFFFFF;
+  --note: #FFF4D6; --stamp: #C7361E;
+  --ui: 'Hiragino Maru Gothic ProN', 'M PLUS Rounded 1c', 'Yu Gothic', 'Meiryo', system-ui, sans-serif;
+  --jp: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', 'Noto Serif CJK JP', serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #12172A; --card: #1C233B; --ink: #E8EBF6; --muted: #A6AECA;
+    --line: #2C3554; --line-strong: #3B466C; --outline: #7B86B4; --hard: #05070F;
+    --accent: #4560E0; --accent-ink: #A9B8FF; --accent-soft: #262F58; --on-accent: #FFFFFF;
+    --note: #37301A; --stamp: #FF8D76;
+    color-scheme: dark;
+  }
+}
+html, body { margin: 0; }
+body { min-width: 320px; max-width: 520px; margin: 0 auto; background: var(--ground); color: var(--ink); font-family: var(--ui); font-size: 15px; line-height: 1.45; font-weight: 500; -webkit-text-size-adjust: 100%; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
+main { display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 16px; }
+.top { display: flex; align-items: center; gap: 10px; }
+.top img { width: 36px; height: 36px; border-radius: 10px; border: 2px solid var(--outline); }
+.brand { flex: 1; min-width: 0; font-size: 19px; font-weight: 800; }
+.brand small { display: block; font-size: 12px; font-weight: 700; color: var(--muted); }
+h2 { margin: 6px 0 0; font-size: 13px; font-weight: 800; color: var(--muted); }
+h2 [lang="ja"] { color: var(--ink); }
+.switch { width: 100%; min-height: 58px; padding: 9px 12px; border-radius: 16px; background: var(--card); border: 2px solid var(--outline); display: flex; align-items: center; gap: 12px; text-align: left; }
+.switch[disabled] { border-color: var(--line-strong); cursor: default; }
+.switch[disabled] .txt { color: var(--muted); }
+.switch .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.switch .nm { font-size: 15px; font-weight: 800; overflow-wrap: anywhere; }
+.switch .nm small { font-size: 12px; font-weight: 700; color: var(--muted); }
+.switch .ds { font-size: 12px; line-height: 1.4; }
+.knob { flex-shrink: 0; width: 52px; height: 30px; box-sizing: border-box; padding: 0 2px; border-radius: 15px; border: 2px solid var(--outline); background: var(--line); display: flex; align-items: center; justify-content: flex-start; }
+.knob i { width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; background: #FFFFFF; border: 2px solid var(--outline); }
+.switch[aria-checked="true"] .knob { background: var(--accent); justify-content: flex-end; }
+.switch[disabled] .knob { border-color: var(--line-strong); background: var(--line); }
+.how { padding: 10px 12px; border-radius: 16px; background: var(--card); border: 2px solid var(--line-strong); font-size: 13px; line-height: 1.5; }
+.how b { font-weight: 800; }
+.how p { margin: 0; }
+.how p + p { margin-top: 6px; }
+.seg { display: flex; gap: 8px; }
+.seg button { flex: 1; min-height: 46px; padding: 4px 6px; border-radius: 14px; border: 2px solid var(--outline); background: var(--card); font-size: 12px; font-weight: 800; line-height: 1.25; }
+.seg button span { display: block; font-family: var(--jp); font-size: 15px; font-weight: 600; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-ink); color: var(--accent-ink); }
+.state { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 8px 12px; border-radius: 14px; background: var(--note); font-size: 13px; font-weight: 700; }
+.state .track { flex: 0 0 90px; height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+.state .track i { display: block; width: 0%; height: 100%; border-radius: 0 5px 5px 0; background: var(--accent); }
+.state.problem { background: none; border: 2px solid var(--stamp); }
+.notebox { padding: 10px 12px; border-radius: 16px; background: var(--note); font-size: 12px; line-height: 1.5; }
+.notebox b { font-weight: 800; }
+.foot { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.foot a { display: inline-flex; align-items: center; min-height: 36px; color: var(--accent-ink); font-size: 13px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <img src="icons/icon-48.png" alt="">
+    <div class="brand">Yaoki Reader <small>Readings and meanings at a touch</small></div>
+  </div>
+
+  <button class="switch" type="button" role="switch" id="sw-on" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">オン</span> <small>On</small></span><span class="ds">On every site, unless you switch it off for one below.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <button class="switch" type="button" role="switch" id="sw-site" aria-checked="true" disabled><span class="txt"><span class="nm" id="site-name">This site</span><span class="ds" id="site-ds">Open a web page to switch Yaoki Reader off for its site.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+
+  <div class="how">
+    <p><b>Touch a Japanese word and keep your finger on it.</b> Its reading shows over the kanji and a card shows what each word means. Slide to the next word; lift your finger and it hides again.</p>
+    <p><b>With a mouse:</b> hold the button down on a word, or hold <b>Shift</b> and point.</p>
+  </div>
+
+  <div class="state" id="state"><span id="state-text">Dictionary: checking…</span><span class="track" id="state-track" hidden><i id="state-bar"></i></span></div>
+
+  <h2><span lang="ja">触れたときに出すもの</span> · What a touch shows</h2>
+  <button class="switch" type="button" role="switch" id="sw-furigana" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">ふりがな</span> <small>Furigana</small></span><span class="ds">Readings above the kanji, in the page and in the card.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <button class="switch" type="button" role="switch" id="sw-meanings" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">語の意味</span> <small>Word meanings</small></span><span class="ds">English under each word. Particles are left untranslated.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+  <button class="switch" type="button" role="switch" id="sw-grammar" aria-checked="true"><span class="txt"><span class="nm"><span lang="ja">文法メモ</span> <small>Grammar note</small></span><span class="ds">The pattern inside the phrase, such as 〜ながら.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+
+  <h2 id="hold-h"><span lang="ja">長押しの長さ</span> · How long to hold</h2>
+  <div class="seg" role="group" aria-labelledby="hold-h">
+    <button type="button" id="hold-0" aria-pressed="false"><span lang="ja">短い</span>Short</button>
+    <button type="button" id="hold-1" aria-pressed="true"><span lang="ja">普通</span>Normal</button>
+    <button type="button" id="hold-2" aria-pressed="false"><span lang="ja">長い</span>Long</button>
+  </div>
+  <p class="ds" style="margin:0;font-size:12px;color:var(--muted)">A shorter hold is quicker; a longer one leaves more time to start scrolling with a finger on the text.</p>
+
+  <div class="notebox"><b lang="ja">文の訳は出ません。</b> A touch never shows a whole-sentence translation. You get the pieces and put the sentence together yourself. Everything is worked out on this device; nothing you read is sent anywhere.</div>
+
+  <div class="foot">
+    <a href="https://jorycook.github.io/Yaoki-reader/" target="_blank" rel="noopener">The Yaoki Reader app</a>
+    <a href="licenses.txt" target="_blank" rel="noopener">Dictionary credits and licences</a>
+  </div>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

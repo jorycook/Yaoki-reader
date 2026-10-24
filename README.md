@@ -4,6 +4,8 @@ Read Japanese with the furigana hidden. Touch a phrase and hold it to see its re
 
 Open it at **https://jorycook.github.io/Yaoki-reader/**. On an iPhone: open the address in Safari, tap Share, then Add to Home Screen.
 
+The same touch works on any Japanese web page with the **browser extension** in `extension/` (Chrome, Edge, Firefox, Firefox for Android, Safari): see [On any web page](#on-any-web-page-the-browser-extension).
+
 ## What it does
 
 - **Your own texts.** Paste up to 30,000 characters of Japanese. Readings, meanings and grammar notes are worked out in the browser; nothing is sent anywhere.
@@ -16,6 +18,31 @@ Open it at **https://jorycook.github.io/Yaoki-reader/**. On an iPhone: open the 
 ### Where Aozora texts come from
 
 Aozora Bunko's own site does not let other web pages fetch its files, so the reader fetches a work's text from aozorahack's copy of Aozora's text files on GitHub (`raw.githubusercontent.com/aozorahack/aozorabunko_text`), which does. That copy stopped following Aozora around 2023 (in a sample, 56 of 60 listed works were in it). For a work that is missing, the page links to the work's zip file on Aozora Bunko and reads that file once it is loaded; it need not be unpacked, and a .txt works too. **Load an Aozora Bunko file** takes such a file at any time. Ruby, notes and the source notes at the end are taken out, and characters that Aozora's Shift_JIS files can only describe (※［＃…、第3水準1-85-25］) are filled in.
+
+## On any web page: the browser extension
+
+`extension/` is Yaoki Reader for every site, not only for texts added to the reader. On a Japanese page, **touch a word and keep your finger on it**: its reading shows over the kanji in the page, the phrase is marked, and the reader's card shows above it with the meaning of each word and any grammar pattern. Slide to the next word without lifting your finger; lift it and everything hides again. A quick swipe still scrolls and a tap still follows a link; holding a link shows the word and does not open it. With a mouse, **hold the button down** on a word (still, for a quarter of a second), or **hold Shift and point**.
+
+It is the reader's own engine, run once in the background for all tabs, so readings and meanings are the reader's, worked out on the device; nothing a page says is sent anywhere. The dictionary loads when a page with Japanese on it opens (a few seconds the first time, then it stays loaded) and is let go after half an hour unused. A page's own furigana (`<ruby>`) decide readings, as Aozora's do in the reader. Kanji with no kana near them on a page not marked Japanese are taken for Chinese and left alone.
+
+The toolbar button opens a panel: switch it off everywhere or for one site, choose what a touch shows (furigana, word meanings, grammar note: the reader's three switches) and how long a hold takes (short, normal, long).
+
+### Building and installing it
+
+```
+python3 tools/extension.py           # builds dist/chrome, dist/firefox, dist/safari and a zip of each
+```
+
+The engine and dictionary are the reader's (`docs/engine/`), copied in by the build, so there is one copy of them in the repository. Each zip is about 23 MB.
+
+- **Chrome, Edge, Brave, Vivaldi on a computer:** open `chrome://extensions`, switch on Developer mode, **Load unpacked**, and pick `dist/chrome`. `dist/yaoki-reader-chrome.zip` is what the Chrome Web Store and Edge Add-ons take. Chrome for Android has no extensions; Vivaldi for Android (8.2 and later) installs them from the Chrome Web Store, and so do some smaller Android browsers.
+- **Firefox on a computer:** `about:debugging` → This Firefox → **Load Temporary Add-on** → `dist/firefox/manifest.json` (it stays until Firefox closes). To keep it, upload `dist/yaoki-reader-firefox.zip` to addons.mozilla.org, listed or unlisted (just for yourself), which signs it.
+- **Firefox for Android:** install the signed add-on from addons.mozilla.org, or from its signed file. While working on it, `web-ext run -t firefox-android` runs `dist/firefox` on a phone connected by USB.
+- **Safari on iPhone, iPad and Mac:** Safari takes extensions only inside an app. On a Mac with Xcode, `xcrun safari-web-extension-packager dist/safari` (formerly `safari-web-extension-converter`) makes the Xcode project; build it to your iPhone, then switch the extension on in Settings → Apps → Safari → Extensions and allow it on all websites. Without a Mac, App Store Connect's Safari Web Extension Packager takes `dist/yaoki-reader-safari.zip` and builds the app for TestFlight. Either way needs an Apple developer account.
+
+The three builds differ only where the browsers do. Chrome's background is a service worker, which cannot hold the engine, so the engine runs in an offscreen document (`host.html`), which Chrome keeps open. Firefox closes a Manifest V3 background page after 30 seconds idle, so its build is Manifest V2 with a background page that stays loaded. iPhone allows only a background page that Safari closes when idle, so in the Safari build pages with Japanese on them wake it every 20 seconds for a quarter of an hour after a lookup; Safari before 18.4 also needs the scripts marked as UTF-8, which the build does.
+
+**Limits.** On iPhone, Safari decides when a finger lands whether a long press will select text, so the touched text is made unselectable at once; if Safari still shows its magnifier on some page, that is Safari's own long press, which a page cannot always stop. Text in images, canvases and form fields is not read. A page inside a frame gets its own card, inside the frame.
 
 ## What is where
 
@@ -35,8 +62,11 @@ The site is `docs/`, served by GitHub Pages (Settings → Pages → Deploy from 
 | `docs/aozora/aozora.js` | Aozora Bunko: searching the catalog, fetching a work, reading a .zip or .txt, taking out Aozora's notation, cutting long works into parts. |
 | `docs/aozora/catalog.txt` | The 17,344 Aozora works out of copyright (titles, authors, file names; no texts), from Aozora's index of 2026-08-20. |
 | `docs/aozora/jisx0213.json` | Characters by their JIS X 0213 place, for the ones Aozora's files describe. |
-| `tools/` | `aozora-catalog.py` (remakes the catalog), `jm-supplement.py`, `kanji-meanings.py`, `jisx0213-table.py`, `icons.mjs`. |
-| `check/` | The tests (Playwright). |
+| `extension/content.js`, `content.css` | The extension on each page: the touch, mouse and Shift gestures; the character under the finger and the sentence around it (with the page's own ruby); the phrase it is in, from the engine; the readings over the kanji, the mark and the card, drawn in a layer of their own (a closed shadow root) so the page is not changed. |
+| `extension/background.js`, `host.js`, `host.html`, `host-offscreen.js` | Pass lookups to the one engine for all tabs (`docs/engine/worker.js`) and keep it running: in Chrome's offscreen document (`host.html`), or in the background page in Firefox and Safari. |
+| `extension/popup.html`, `popup.js`, `manifest.json`, `icons/` | The toolbar panel (settings kept in the browser's extension storage), the manifest the three builds are made from, and the icons (drawn by `tools/icons.mjs`). |
+| `tools/` | `aozora-catalog.py` (remakes the catalog), `jm-supplement.py`, `kanji-meanings.py`, `jisx0213-table.py`, `icons.mjs`, `extension.py` (builds the extension into `dist/`). |
+| `check/` | The tests (Playwright; Selenium for the extension in Firefox). |
 
 To bring the catalog up to date with Aozora Bunko:
 
@@ -57,6 +87,13 @@ bash run.sh aozora-test.js    # Aozora Bunko: search, fetch, parts, a downloaded
 
 `BACKUP=<a reader backup file>` with `reader-test.js` also loads that file and opens every text in it.
 
+The extension, built first by the tests themselves:
+
+```
+node extension-test.js        # Chromium with the extension: holding, sliding, letting go, swipes and links, mouse and Shift, ruby, vertical text, strict CSP, the panel
+FIREFOX=<firefox> GECKODRIVER=<geckodriver> python3 extension-firefox-test.py   # the Firefox build in Firefox (needs Selenium and Pillow)
+```
+
 ## Licences
 
-Listed in `docs/licenses.txt`: Aozora Bunko (the catalog, and where the texts come from), JMdict and KANJIDIC2 (EDRDG, CC BY-SA 4.0; the shortened word list, its supplement and the kanji meanings under the same licence), kuromoji.js (Apache-2.0, with the mecab-ipadic notice) and the typefaces loaded from Google Fonts (SIL Open Font License 1.1). Only add texts you are free to keep a copy of; nothing you add goes into this repository.
+Listed in `docs/licenses.txt`: Aozora Bunko (the catalog, and where the texts come from), JMdict and KANJIDIC2 (EDRDG, CC BY-SA 4.0; the shortened word list, its supplement and the kanji meanings under the same licence), kuromoji.js (Apache-2.0, with the mecab-ipadic notice) and the typefaces loaded from Google Fonts (SIL Open Font License 1.1). Each build of the extension carries the same `licenses.txt`, linked from its panel (it loads no typefaces from the web). Only add texts you are free to keep a copy of; nothing you add goes into this repository.
