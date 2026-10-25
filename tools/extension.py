@@ -110,6 +110,13 @@ def made_from(out, files):
     return os.path.exists(out) and os.path.exists(stamp) and open(stamp).read() == fingerprint(files)
 
 
+def unstamp(out):
+    """Forget what out was made from before making it again, so that a build stopped half way is not taken for a
+    finished one next time."""
+    if os.path.exists(out + '.from'):
+        os.remove(out + '.from')
+
+
 def stamp_from(out, files):
     with open(out + '.from', 'w') as fh:
         fh.write(fingerprint(files))
@@ -120,6 +127,7 @@ def packed_dict():
     out = os.path.join(DIST, 'dict')
     files = [os.path.join(ENGINE, 'dict', n) for n in sorted(os.listdir(os.path.join(ENGINE, 'dict')))] + [os.path.abspath(__file__)]
     if not made_from(out, files):
+        unstamp(out)
         if os.path.exists(out):
             shutil.rmtree(out)
         pack_dict(out)
@@ -147,10 +155,17 @@ def pack_dict(out):
 
 def make_index():
     """The engine's word index made ahead of time (tools/jm-index.js, by the engine's own code), once for all
-    builds."""
+    builds. It needs Node; without it the builds go without the index, and the engine makes its own at each start
+    (a second or more slower)."""
     out = os.path.join(DIST, 'jm-index.bin.gz')
     files = [os.path.join(ENGINE, f) for f in ('analyzer.js', 'jm-1.txt', 'jm-2.txt', 'jm-3.txt')] + [os.path.join(HERE, 'jm-index.js')]
     if not made_from(out, files):
+        unstamp(out)
+        if not shutil.which('node'):
+            print('warning: Node is not installed, so the builds have no word index made ahead of time (the engine makes it at each start)')
+            if os.path.exists(out):
+                os.remove(out)
+            return None
         subprocess.run(['node', os.path.join(HERE, 'jm-index.js'), out], check=True)
         stamp_from(out, files)
     return out
@@ -172,7 +187,8 @@ def build(name, shape, offscreen, bom, index, dict_dir):
     for item in ENGINE_FILES:
         copy(os.path.join(ENGINE, item), os.path.join(out, 'engine', item))
     copy(dict_dir, os.path.join(out, 'engine', 'dict'))
-    copy(index, os.path.join(out, 'engine', 'jm-index.bin.gz'))
+    if index:
+        copy(index, os.path.join(out, 'engine', 'jm-index.bin.gz'))
     copy(os.path.join(TOP, 'docs', 'licenses.txt'), os.path.join(out, 'licenses.txt'))
     if bom:
         mark_utf8(out)

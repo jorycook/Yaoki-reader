@@ -12,7 +12,7 @@ const TOP = path.join(__dirname, '..');
 const EXT = path.join(TOP, 'dist', 'chrome');
 const SITE = 'http://yaoki.test/';
 let fails = 0;
-const ok = (cond, msg) => { console.log((cond ? '  ok: ' : '  FAIL: ') + msg); if (!cond) fails += 1; };
+const ok = (cond, msg) => { console.log((cond ? '  ok: ' : '  FAIL: ') + msg); if (!cond) fails += 1; return cond; };
 const step = (msg) => console.log('-- ' + msg);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -215,34 +215,39 @@ async function main() {
   step('the card keeps clear of the finger, upright and sideways');
   await page.goto(SITE + 'place.html');
   await wait(300);
-  /* a character of the text near a height on the screen (a share of it) */
-  const near = (share) => page.evaluate((share) => {
+  /* a character of the text near a height on the screen (a share of it): one inside a phrase, the last of a phrase
+     (the は of 図書館では or 親子は), or the first on a line */
+  const near = (share, kind) => page.evaluate(([share, kind]) => {
     const y = innerHeight * share, w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let n, best = null;
     while ((n = w.nextNode())) {
-      for (let i = 0; i < n.data.length; i += 7) {
-        if (!/[一-鿿]/.test(n.data[i])) continue;
+      for (let i = 0; i < n.data.length; i++) {
+        const c = n.data[i];
+        if (kind === 'inside' && (i % 7 || !/[一-鿿]/.test(c))) continue;
+        if (kind === 'end' && !(c === 'は' && /(館で|親子)$/.test(n.data.slice(0, i)))) continue;
+        if (kind === 'start' && !/[一-鿿ぁ-ゖ]/.test(c)) continue;
         const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1);
         const b = r.getBoundingClientRect();
-        if (b.left < 40 || b.right > innerWidth - 40) continue;
+        if (kind === 'start' ? b.left > 30 : b.left < 40 || b.right > innerWidth - 40) continue;
         const d = Math.abs(b.top + b.height / 2 - y);
         if (!best || d < best.d) best = { d, x: b.left + b.width / 2, y: b.top + b.height / 2, top: b.top, bottom: b.bottom, left: b.left, right: b.right };
       }
     }
     return best;
-  }, share);
+  }, [share, kind]);
   const crosses = (a, b) => a && b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
   for (const [label, size] of [['upright', { width: 390, height: 700 }], ['sideways', { width: 844, height: 340 }]]) {
     await page.setViewportSize(size);
     await wait(300);
-    for (const share of [0.15, 0.45, 0.8]) {
-      p = await near(share);
+    for (const [share, kind] of [[0.15, 'inside'], [0.45, 'inside'], [0.8, 'inside'], [0.15, 'end'], [0.8, 'end'], [0.1, 'start']]) {
+      p = await near(share, kind);
+      if (!ok(!!p, label + ': a character ' + kind + ' near ' + Math.round(share * 100) + '% to hold')) continue;
       await hold(p);
       L = await until(async () => { const l = await layer(); return l.shown && l.marks > 0 && l; }, 5000);
-      const where = label + ' at ' + Math.round(share * 100) + '%';
+      const where = label + ', ' + { inside: 'inside a phrase', end: 'the end of a phrase', start: 'the start of a line' }[kind] + ' at ' + Math.round(share * 100) + '%';
       ok(L && !crosses(L.rect, L.kept), where + ': the card leaves the phrase and its readings in view');
-      ok(L && (L.rect.bottom <= p.y || L.rect.top >= p.y + 50 || L.rect.right <= p.left || L.rect.left >= p.right), where + ': the card is not under the fingertip');
-      if (label === 'sideways') ok(L && !crosses(L.rect, { left: p.x - 38, right: p.x + 38, top: p.y - 10, bottom: p.y + 110 }), where + ': nor where the thumb is');
+      ok(L && !crosses(L.rect, { left: p.x - 38, right: p.x + 38, top: p.y - 10, bottom: p.y + 110 }), where + ': it is clear of the fingertip and the thumb below it');
+      ok(L && L.rect.left >= -1 && L.rect.right <= size.width + 1 && L.rect.top >= -1 && L.rect.bottom <= size.height + 1, where + ': and on the screen');
       await lift();
     }
   }

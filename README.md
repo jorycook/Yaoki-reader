@@ -23,7 +23,7 @@ Aozora Bunko's own site does not let other web pages fetch its files, so the rea
 
 `extension/` is Yaoki Reader for every site, not only for texts added to the reader. On a Japanese page, **touch a word and keep your finger on it**: its reading shows over the kanji in the page, the phrase is marked, and the reader's card shows above it with the meaning of each word and any grammar pattern. Slide to the next word without lifting your finger; lift it and everything hides again. A quick swipe still scrolls and a tap still follows a link; holding a link shows the word and does not open it. With a mouse, **hold the button down** on a word (still, for a quarter of a second), or **hold Shift and point**.
 
-It is the reader's own engine, run once in the background for all tabs, so readings and meanings are the reader's, worked out on the device; nothing a page says is sent anywhere. The dictionary loads when a page with Japanese on it opens (a few seconds the first time, then it stays loaded) and is let go after half an hour unused. A page's own furigana (`<ruby>`) decide readings, as Aozora's do in the reader. Kanji with no kana near them on a page not marked Japanese are taken for Chinese and left alone.
+It is the reader's own engine, run once in the background for all tabs, so readings and meanings are the reader's, worked out on the device; nothing a page says is sent anywhere. The dictionary loads (in about a second on a computer, a few on a phone) when a page with Japanese on it opens, when such a tab comes back on screen, or when a finger lands on Japanese with the dictionary not loaded; it is let go after half an hour unused, and Safari lets it go sooner, to save memory. A page's own furigana (`<ruby>`) decide readings, as Aozora's do in the reader. Kanji with no kana near them on a page not marked Japanese are taken for Chinese and left alone.
 
 The toolbar button opens a panel: switch it off everywhere or for one site, choose what a touch shows (furigana, word meanings, grammar note: the reader's three switches) and how long a hold takes (short, normal, long).
 
@@ -32,6 +32,8 @@ The toolbar button opens a panel: switch it off everywhere or for one site, choo
 ```
 python3 tools/extension.py           # builds dist/chrome, dist/firefox, dist/safari and a zip of each
 ```
+
+It needs Python 3 and Node (Node makes the word index; without it the builds go without the index and the engine makes its own at each start, a second or more slower). The packed dictionary and the index are kept in `dist/` (`dist/dict`, `dist/jm-index.bin.gz`, each with a `.from` fingerprint of its sources) and made again only when those sources change.
 
 The engine and dictionary are the reader's (`docs/engine/`), copied in by the build, so there is one copy of them in the repository. Two parts are packed for the extension as they are copied, so the engine starts in under a second on a computer (three times faster than the reader's files allow, and holding about 60 MB less): the tokenizer's dictionary as gzip binary without its padding, which the browser unpacks itself, and the engine's word index made ahead of time (`tools/jm-index.js`, by the engine's own code), which the engine would otherwise make at each start. Each zip is about 29 MB.
 

@@ -637,9 +637,18 @@ function placeCard(keep, touchy) {
   var card = layer.card, v = view();
   card.style.visibility = 'hidden'; card.hidden = false;
   card.style.transform = 'none';
-  card.style.maxWidth = Math.max(160, Math.min(560, (v.width / v.k) - 20)) + 'px';
+  var widest = Math.max(160, Math.min(560, (v.width / v.k) - 20));
+  card.style.maxWidth = widest + 'px';
   var w = card.offsetWidth * v.k, h = card.offsetHeight * v.k;
   var p = touchy ? touchPlace(keep, w, h, v) : mousePlace(keep, w, h, v);
+  /* below the finger, where the card would lie across its column: laid out narrower beside the column instead
+     (its words wrap onto more lines), and made smaller only if it then runs off the screen */
+  if (p.beside) {
+    card.style.maxWidth = Math.min(widest, p.beside.room / v.k) + 'px';
+    w = card.offsetWidth * v.k; h = card.offsetHeight * v.k;
+    var s = Math.max(0.5, Math.min(1, (v.top + v.height - 4 - p.top) / h));
+    p = { left: p.beside.right ? p.beside.from : p.beside.from - w * s, top: p.top, scale: s };
+  }
   card.style.transform = 'translate(' + Math.round(p.left) + 'px, ' + Math.round(p.top) + 'px) scale(' + v.k * p.scale + ')';
   card.style.visibility = 'visible';
 }
@@ -653,39 +662,40 @@ function mousePlace(keep, w, h, v) {
   if (top + h > v.top + v.height - 4) top = Math.max(v.top + 4, v.top + v.height - h - 4);
   return { left: centred(keep, w, v), top: top, scale: 1 };
 }
-/* With a finger, the hand covers the phrase and what is below it, so the card goes, in this order: above the
-   phrase; beside it, where there is room (a phone held sideways); above it a little smaller; below the fingertip
-   with room for it, moved off to the side the finger is not on; and when nothing fits, made smaller to fit the
-   larger room, above or below. It never covers the phrase or its readings. */
+/* With a finger, the hand covers the phrase, the fingertip (about a finger's width either side of the touch) and
+   what is below them, so the card goes, in this order: above the phrase; beside it and the fingertip, where there is
+   room (a phone held sideways, or a word at the edge of the screen); above it a little smaller; below the
+   fingertip with room for it, clear of the finger's column (beside it, narrower, when centred would lie across it);
+   and when nothing fits, made smaller to fit the larger room, above or below. */
 function touchPlace(keep, w, h, v) {
   var k = v.k, gap = 10 * k, top0 = v.top + 4, bottom0 = v.top + v.height - 4, s;
+  var x = lastPoint ? lastPoint.x : keep.left + keep.width / 2, clear = 40 * k;
   var above = keep.top - gap - top0;
   if (h <= above) return { left: centred(keep, w, v), top: keep.top - gap - h, scale: 1 };
-  var leftRoom = keep.left - gap - (v.left + 8), rightRoom = v.left + v.width - 8 - (keep.right + gap);
+  var lEdge = Math.min(keep.left, x - clear), rEdge = Math.max(keep.right, x + clear);
+  var leftRoom = lEdge - gap - (v.left + 8), rightRoom = v.left + v.width - 8 - (rEdge + gap);
   if (Math.max(leftRoom, rightRoom) >= w && h <= bottom0 - top0) {
-    return { left: leftRoom > rightRoom ? keep.left - gap - w : keep.right + gap, top: Math.max(top0, Math.min(keep.bottom - h, bottom0 - h)), scale: 1 };
+    return { left: leftRoom > rightRoom ? lEdge - gap - w : rEdge + gap, top: Math.max(top0, Math.min(keep.bottom - h, bottom0 - h)), scale: 1 };
   }
   if (h * 0.85 <= above) {
     s = above / h;
     return { left: centred(keep, w * s, v), top: keep.top - gap - h * s, scale: s };
   }
   var under = Math.max(keep.bottom + gap, (lastPoint ? lastPoint.y : keep.bottom) + 56 * k);
-  if (under + h <= bottom0) return { left: aside(keep, w, v), top: under, scale: 1 };
+  var left = centred(keep, w, v);
+  if (under + h <= bottom0 && (left >= x + clear || left + w <= x - clear)) return { left: left, top: under, scale: 1 };
+  var toRight = v.left + v.width - 8 - (x + clear), toLeft = x - clear - (v.left + 8);
+  if (Math.max(toRight, toLeft) >= 160 * k && under + 60 * k <= bottom0) {
+    return { top: under, beside: toRight >= toLeft ? { right: true, from: x + clear, room: toRight } : { right: false, from: x - clear, room: toLeft } };
+  }
+  if (under + h <= bottom0) return { left: left, top: under, scale: 1 };
   var below = bottom0 - under;
   if (above >= below) {
     s = Math.max(0.5, Math.min(1, above / h));
     return { left: centred(keep, w * s, v), top: Math.max(top0, keep.top - gap - h * s), scale: s };
   }
   s = Math.max(0.5, Math.min(1, below / h));
-  return { left: aside(keep, w * s, v), top: under, scale: s };
-}
-/* centred on the phrase, unless that puts it across the finger: then on the side of the finger with more room */
-function aside(keep, w, v) {
-  var left = centred(keep, w, v), x = lastPoint ? lastPoint.x : -1, clear = 24 * v.k;
-  if (x < left || x > left + w) return left;
-  var right = x + clear, leftEnd = x - clear;
-  if (v.left + v.width - 8 - right >= leftEnd - (v.left + 8)) return right + w <= v.left + v.width - 8 ? right : left;
-  return leftEnd - w >= v.left + 8 ? leftEnd - w : left;
+  return { left: centred(keep, w * s, v), top: under, scale: s };
 }
 function clearMarks() {
   if (!host || !layer.marks) return;
