@@ -411,6 +411,7 @@ function analyse(spot) {
   return send({ type: 'yaoki:analyze', text: spot.text, ruby: spot.ruby }).then(function (res) {
     keepAwake(res);
     if (res && res.analysis) {
+      lastAnswer = Date.now();
       cache.set(key, res.analysis);
       if (cache.size > CACHE) cache.delete(cache.keys().next().value);
     }
@@ -486,6 +487,12 @@ var STYLE = [
   '.no-furi .rt { visibility: hidden; }',
   '.le { min-height: 15px; max-width: 180px; font-size: 12px; font-weight: 700; line-height: 15px; text-align: center; text-wrap: balance; }',
   '.no-mean .le { display: none; }',
+  '.lb { display: flex; align-items: baseline; gap: 4px; margin-top: 3px; white-space: nowrap; }',
+  '.lb b { font-size: 10px; font-weight: 800; color: var(--accent-ink); }',
+  '.lb span { font-family: var(--jp); font-size: 15px; font-weight: 600; }',
+  '.lb i { font-style: normal; font-size: 11px; font-weight: 700; color: var(--muted); }',
+  '.no-mean .lb { display: none; }',
+  '.no-furi .lb i { display: none; }',
   '.lg { display: flex; align-items: baseline; gap: 8px; padding: 5px 10px; border-radius: 10px; background: var(--accent-soft); line-height: 22px; }',
   '.lg b { flex-shrink: 0; font-size: 11px; font-weight: 800; color: var(--accent-ink); }',
   '.lg span { flex-shrink: 0; font-family: var(--jp); font-size: 15px; font-weight: 600; }',
@@ -559,13 +566,14 @@ function fillCard(c) {
   var card = layer.card;
   card.textContent = '';
   card.className = 'card' + (S.furigana ? '' : ' no-furi') + (S.meanings ? '' : ' no-mean');
-  var row = el('div', 'lw');
-  c.w.forEach(function (w) {
+  var row = el('div', 'lw'), form = dictionaryForm(c);
+  c.w.forEach(function (w, i) {
     var col = el('div', w.f ? 'lc f' : 'lc');
     var j = el('div', 'lj'); j.lang = 'ja';
     rubyInto(j, w.s, true);
     col.appendChild(j);
     col.appendChild(el('div', 'le', w.e || ' '));
+    if (form && form.at === i) col.appendChild(form.el);
     row.appendChild(col);
   });
   card.appendChild(row);
@@ -577,6 +585,26 @@ function fillCard(c) {
     card.appendChild(line);
   });
 }
+/* The main word as a dictionary lists it (行く for 行きません, 関わる for 関わった), under its meaning, when the
+   phrase does not show it as it is: the engine sends it with every phrase (d: form, reading, meaning), and the
+   word it belongs to is the one with that meaning. */
+function dictionaryForm(c) {
+  var d = c.d;
+  if (!d || !d[0]) return null;
+  for (var i = 0; i < c.w.length; i++) {
+    var w = c.w[i];
+    if (w.f || !w.e || w.e !== d[2]) continue;
+    var written = w.s.map(function (x) { return x[0]; }).join('');
+    if (written.indexOf(d[0]) === 0) return null;
+    var box = el('div', 'lb');
+    var tag = el('b', null, '辞書形'); tag.lang = 'ja';
+    var word = el('span', null, d[0]); word.lang = 'ja';
+    box.appendChild(tag); box.appendChild(word);
+    if (d[1]) { var r = el('i', null, d[1]); r.lang = 'ja'; box.appendChild(r); }
+    return { at: i, el: box };
+  }
+  return null;
+}
 function waitCard(status) {
   var card = layer.card;
   card.textContent = '';
@@ -584,7 +612,7 @@ function waitCard(status) {
   var box = el('div', 'wait');
   var ja = el('div', 'ja', '辞書を準備しています…'); ja.lang = 'ja';
   box.appendChild(ja);
-  box.appendChild(el('div', null, 'Getting the dictionary ready. The first time takes a few seconds; after that it stays loaded.'));
+  box.appendChild(el('div', null, 'Loading the dictionary (a few seconds). The browser lets it go when it has not been used for a while, to save memory.'));
   var track = el('div', 'track'), bar = el('i');
   bar.style.width = Math.round(100 * ((status && status.done) || 0) / ((status && status.total) || 17)) + '%';
   track.appendChild(bar); box.appendChild(track);
@@ -604,20 +632,60 @@ function view() {
   var k = 1 / (vv.scale || 1);
   return { left: vv.offsetLeft, top: vv.offsetTop, width: vv.width, height: vv.height, k: Math.max(0.2, Math.min(5, k)) };
 }
-function placeCard(about, touchy, room) {
+/* Puts the card by what it is about (the phrase and the readings over it, which it never covers). */
+function placeCard(keep, touchy) {
   var card = layer.card, v = view();
   card.style.visibility = 'hidden'; card.hidden = false;
   card.style.transform = 'none';
   card.style.maxWidth = Math.max(160, Math.min(560, (v.width / v.k) - 20)) + 'px';
   var w = card.offsetWidth * v.k, h = card.offsetHeight * v.k;
-  var gap = 10 * v.k + room;
-  var top = about.top - h - gap;
-  if (top < v.top + 4) top = about.bottom + (touchy ? 28 : 14) * v.k;
-  if (top + h > v.top + v.height - 4) top = Math.max(v.top + 4, v.top + v.height - h - 4);
-  var left = about.left + about.width / 2 - w / 2;
-  left = Math.max(v.left + 8, Math.min(left, v.left + v.width - w - 8));
-  card.style.transform = 'translate(' + Math.round(left) + 'px, ' + Math.round(top) + 'px) scale(' + v.k + ')';
+  var p = touchy ? touchPlace(keep, w, h, v) : mousePlace(keep, w, h, v);
+  card.style.transform = 'translate(' + Math.round(p.left) + 'px, ' + Math.round(p.top) + 'px) scale(' + v.k * p.scale + ')';
   card.style.visibility = 'visible';
+}
+function centred(keep, w, v) {
+  return Math.max(v.left + 8, Math.min(keep.left + keep.width / 2 - w / 2, v.left + v.width - w - 8));
+}
+/* with a mouse: above the phrase, or below it when there is no room above */
+function mousePlace(keep, w, h, v) {
+  var top = keep.top - h - 10 * v.k;
+  if (top < v.top + 4) top = keep.bottom + 14 * v.k;
+  if (top + h > v.top + v.height - 4) top = Math.max(v.top + 4, v.top + v.height - h - 4);
+  return { left: centred(keep, w, v), top: top, scale: 1 };
+}
+/* With a finger, the hand covers the phrase and what is below it, so the card goes, in this order: above the
+   phrase; beside it, where there is room (a phone held sideways); above it a little smaller; below the fingertip
+   with room for it, moved off to the side the finger is not on; and when nothing fits, made smaller to fit the
+   larger room, above or below. It never covers the phrase or its readings. */
+function touchPlace(keep, w, h, v) {
+  var k = v.k, gap = 10 * k, top0 = v.top + 4, bottom0 = v.top + v.height - 4, s;
+  var above = keep.top - gap - top0;
+  if (h <= above) return { left: centred(keep, w, v), top: keep.top - gap - h, scale: 1 };
+  var leftRoom = keep.left - gap - (v.left + 8), rightRoom = v.left + v.width - 8 - (keep.right + gap);
+  if (Math.max(leftRoom, rightRoom) >= w && h <= bottom0 - top0) {
+    return { left: leftRoom > rightRoom ? keep.left - gap - w : keep.right + gap, top: Math.max(top0, Math.min(keep.bottom - h, bottom0 - h)), scale: 1 };
+  }
+  if (h * 0.85 <= above) {
+    s = above / h;
+    return { left: centred(keep, w * s, v), top: keep.top - gap - h * s, scale: s };
+  }
+  var under = Math.max(keep.bottom + gap, (lastPoint ? lastPoint.y : keep.bottom) + 56 * k);
+  if (under + h <= bottom0) return { left: aside(keep, w, v), top: under, scale: 1 };
+  var below = bottom0 - under;
+  if (above >= below) {
+    s = Math.max(0.5, Math.min(1, above / h));
+    return { left: centred(keep, w * s, v), top: Math.max(top0, keep.top - gap - h * s), scale: s };
+  }
+  s = Math.max(0.5, Math.min(1, below / h));
+  return { left: aside(keep, w * s, v), top: under, scale: s };
+}
+/* centred on the phrase, unless that puts it across the finger: then on the side of the finger with more room */
+function aside(keep, w, v) {
+  var left = centred(keep, w, v), x = lastPoint ? lastPoint.x : -1, clear = 24 * v.k;
+  if (x < left || x > left + w) return left;
+  var right = x + clear, leftEnd = x - clear;
+  if (v.left + v.width - 8 - right >= leftEnd - (v.left + 8)) return right + w <= v.left + v.width - 8 ? right : left;
+  return leftEnd - w >= v.left + 8 ? leftEnd - w : left;
 }
 function clearMarks() {
   if (!host || !layer.marks) return;
@@ -657,8 +725,8 @@ function clash(a, b, upright) {
   if (upright) return a.box.left + a.box.width / 2 + a.el.offsetWidth / 2 + 1 > b.box.left + b.box.width / 2 - b.el.offsetWidth / 2;
   return a.box.top + a.box.height / 2 + a.el.offsetHeight / 2 + 1 > b.box.top + b.box.height / 2 - b.el.offsetHeight / 2;
 }
-/* Marks the phrase in the page and puts each reading over its kanji. Returns the box around the phrase and how
-   much room the readings take above it. */
+/* Marks the phrase in the page and puts each reading over its kanji. Returns the box around the phrase and its
+   readings. */
 function markPhrase(spot, ph) {
   clearMarks();
   var g = spot.g, base = spot.from;
@@ -666,9 +734,9 @@ function markPhrase(spot, ph) {
   var rects = range ? rectsOf(range) : [];
   if (!rects.length) {
     var r = spot.el && spot.el.getBoundingClientRect ? spot.el.getBoundingClientRect() : { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
-    return { box: { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }, room: 0 };
+    return { box: { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height } };
   }
-  var room = 0, upright = !vertical(range.startContainer);
+  var upright = !vertical(range.startContainer);
   /* The browser marks the text itself where it can; boxes of our own are drawn over it where it cannot: Safari does
      not mark text that cannot be selected (held text cannot be), Firefox and Safari do not reach into a web
      component, and Chrome gets vertical text wrong. */
@@ -712,7 +780,6 @@ function markPhrase(spot, ph) {
         x = Math.max(v.left + 2, Math.min(x, v.left + v.width - w - 2));
         y = it.box.top - h - 1;
         end = x + w;
-        room = Math.max(room, h + 1);
       } else {
         x = it.box.right + 1;
         y = Math.max(it.box.top + it.box.height / 2 - h / 2, end + 1);
@@ -722,7 +789,13 @@ function markPhrase(spot, ph) {
       it.el.style.visibility = 'visible';
     });
   }
-  return { box: union(rects), room: room };
+  /* the phrase with its readings, which the card must leave in view */
+  var cover = union(rects);
+  Array.prototype.forEach.call(layer.readings.children, function (e) {
+    var r = e.getBoundingClientRect();
+    if (r.width) cover = union([cover, r]);
+  });
+  return { box: cover };
 }
 
 /* the latest place asked for; answers for earlier places are dropped */
@@ -747,11 +820,11 @@ function lookAt(x, y, touchy, found) {
       redraw();
     } else if (res.wait) {
       shown = { key: '', spot: spot, ph: null, at: -1, touchy: touchy };
-      clearMarks(); waitCard(res.wait); lift(); placeCard(boxOfSpot(spot), touchy, 0);
+      clearMarks(); waitCard(res.wait); lift(); placeCard(boxOfSpot(spot), touchy);
       retry = setTimeout(function () { if (n === asked && holdingAny() && lastPoint) { asked++; lookAt(lastPoint.x, lastPoint.y, lastTouchy); } }, 300);
     } else {
       shown = { key: '', spot: spot, ph: null, at: -1, touchy: touchy };
-      clearMarks(); problemCard(res.error || 'unknown error'); lift(); placeCard(boxOfSpot(spot), touchy, 0);
+      clearMarks(); problemCard(res.error || 'unknown error'); lift(); placeCard(boxOfSpot(spot), touchy);
     }
   });
   return true;
@@ -766,7 +839,7 @@ function redraw() {
   lift();
   var m = markPhrase(shown.spot, shown.ph);
   fillCard(shown.ph.c);
-  placeCard(m.box, shown.touchy, m.room);
+  placeCard(m.box, shown.touchy);
 }
 function hideCard() {
   if (!host || !layer.card) return;
@@ -848,7 +921,10 @@ function onTouchStart(e) {
   var t = e.touches[0];
   touch = { x: t.clientX, y: t.clientY, cx: t.clientX, cy: t.clientY, moved: false };
   var mine = japaneseAt(e.target);
-  if (mine) arm();
+  if (mine) {
+    arm();
+    if (Date.now() - lastAnswer > 25000) nudge();
+  }
   quietHere(mine);
   watchEnd(e.target);
   holdTimer = setTimeout(function () {
@@ -1010,13 +1086,30 @@ function pageLooksJapaneseSoon() {
 function warm() {
   if (!active() || !pageIsJapanese()) return;
   arm();
-  if (window === window.top) send({ type: 'yaoki:warm' }).then(keepAwake);
+  if (window === window.top) nudge();
 }
-/* nothing is armed or loaded before the settings say Yaoki Reader is on for this site */
+/* The engine is asked to start (it starts only if it is not running) as soon as it is likely to be needed: when a
+   Japanese page opens, when its tab comes back to the screen (on a phone, after another app, Safari has often closed
+   the engine), and when a finger lands on Japanese and nothing has been heard from the engine for a while, so the
+   load runs during the hold, not after it. A burst of these (a tab coming back, then a touch) sends one message. */
+var lastWarm = 0, lastAnswer = 0;
+function nudge() {
+  if (Date.now() - lastWarm < 2000) return;
+  lastWarm = Date.now();
+  send({ type: 'yaoki:warm' }).then(function (res) {
+    if (res && res.state === 'ready') lastAnswer = Date.now();
+    keepAwake(res);
+  });
+}
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') warm(); });
+window.addEventListener('pageshow', function (e) { if (e.persisted) warm(); });
+/* nothing is armed or loaded before the settings say Yaoki Reader is on for this site; a page that says it is
+   Japanese starts the engine at once (Safari has no idle callback, so waiting for one costs it 1.5 s) */
 settingsRead.then(function () {
   if (!active()) return;
-  if (pageLooksJapaneseSoon()) arm();
-  if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 3000 }); else setTimeout(warm, 1500);
+  if (pageLooksJapaneseSoon()) warm();
+  else if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 3000 });
+  else setTimeout(warm, 1500);
 });
 /* Where the browser closes the engine's background page when it has been idle (Safari), an open page with Japanese
    on it pings it every 20 s for a quarter of an hour after it opened or was last used, while it is on screen, so

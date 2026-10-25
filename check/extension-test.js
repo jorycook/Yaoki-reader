@@ -21,6 +21,7 @@ const PAGES = {
 <body style="margin:0;padding:300px 30px 30px;font:20px/1.8 serif;width:600px">
 <p id="weather">今日はいい天気ですね！明日、一緒に行きませんか？</p>
 <p id="link"><a href="${SITE}next.html">新しい記事を読む</a></p>
+<p id="kakawa">彼はその事件に関わった。</p>
 <p id="english">This line is English and nothing happens when it is held.</p>
 <div id="editor" contenteditable="true">ここに感想を書いてください。</div>
 <p id="ruby">その<ruby><rb>犍陀多</rb><rp>（</rp><rt>かんだた</rt><rp>）</rp></ruby>と云う男は、<ruby>蜘蛛<rt>くも</rt></ruby>を助けた。</p>
@@ -57,6 +58,10 @@ ${'<p>駅の前に小さな本屋があって、私は毎朝そこで新聞を�
 </body></html>`,
   'xhtml.xhtml': `<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" lang="ja"><head><title>x</title></head>
 <body style="margin:0;padding:300px 30px;font:20px/1.8 serif"><div id="x">一行目の文章です<br/>二行目の文章です<br/>三行目</div></body></html>`,
+  'place.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>place</title>
+<body style="margin:0;padding:8px 16px;font:17px/1.8 sans-serif">
+${'<p>小さな町の図書館では、毎週土曜日に子ども向けの読み聞かせ会が開かれている。参加した親子は静かに話を聞いていた。</p>'.repeat(40)}
+</body></html>`,
   'desktop.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><title>desktop</title>
 <body style="margin:0;padding:200px 30px;width:960px;font:16px/1.7 sans-serif"><p id="d">駅前の喫茶店で友達と待ち合わせをした。</p></body></html>`,
 };
@@ -104,6 +109,8 @@ async function main() {
           readings: Array.from(this.querySelectorAll('.rd')).map((e) => { const b = e.getBoundingClientRect(); return { text: e.textContent, left: b.left, top: b.top, right: b.right, bottom: b.bottom, vertical: e.classList.contains('v') }; }),
           marks: this.querySelectorAll('.mark').length,
           markTop: (this.querySelector('.mark') || { getBoundingClientRect: () => ({ top: -1 }) }).getBoundingClientRect().top,
+          kept: (() => { let u = null; this.querySelectorAll('.mark, .rd').forEach((e) => { const r = e.getBoundingClientRect(); if (!r.width) return; u = u ? { left: Math.min(u.left, r.left), top: Math.min(u.top, r.top), right: Math.max(u.right, r.right), bottom: Math.max(u.bottom, r.bottom) } : { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; }); return u; })(),
+          forms: Array.from(card.querySelectorAll('.lb')).filter((e) => getComputedStyle(e).display !== 'none').map((e) => e.textContent),
           inTopLayer: this.host.matches(':popover-open'),
           fills: this.querySelectorAll('.mark.fill').length,
         };
@@ -190,18 +197,58 @@ async function main() {
   await hold(p);
   L = await until(async () => { const l = await layer(); return l.shown && /行/.test(l.card) && l; }, 5000);
   ok(L && /文法/.test(L.card) && /ません/.test(L.card), 'holding 行きません shows the 〜ません note: ' + (L && L.card));
+  ok(L && L.forms.length === 1 && /辞書形行くいく/.test(L.forms[0]), 'and its dictionary form 行く (いく): ' + JSON.stringify(L && L.forms));
   await lift();
 
-  step('near the top of the screen the card goes below the word, clear of it');
-  await page.evaluate(() => scrollTo(0, document.getElementById('weather').offsetTop - 20));
-  await wait(200);
+  step('the dictionary form of an inflected word, and none for a word as the dictionary has it');
+  p = await at('#kakawa', '関');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /関わ/.test(l.card) && l; }, 5000);
+  ok(L && L.forms.length === 1 && /関わるかかわる/.test(L.forms[0]), 'holding 関わった shows 関わる (かかわる): ' + JSON.stringify(L && L.forms));
+  await lift();
   p = await at('#weather', '天');
   await hold(p);
   L = await until(async () => { const l = await layer(); return l.shown && /天気/.test(l.card) && l; }, 5000);
-  ok(L && L.rect.top >= p.bottom + 10, 'the card is below the word (' + Math.round(p.bottom) + ' → ' + Math.round(L && L.rect.top) + ')');
+  ok(L && L.forms.length === 0, 'holding 天気 shows none');
   await lift();
-  await page.evaluate(() => scrollTo(0, 0));
-  await wait(200);
+
+  step('the card keeps clear of the finger, upright and sideways');
+  await page.goto(SITE + 'place.html');
+  await wait(300);
+  /* a character of the text near a height on the screen (a share of it) */
+  const near = (share) => page.evaluate((share) => {
+    const y = innerHeight * share, w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let n, best = null;
+    while ((n = w.nextNode())) {
+      for (let i = 0; i < n.data.length; i += 7) {
+        if (!/[一-鿿]/.test(n.data[i])) continue;
+        const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1);
+        const b = r.getBoundingClientRect();
+        if (b.left < 40 || b.right > innerWidth - 40) continue;
+        const d = Math.abs(b.top + b.height / 2 - y);
+        if (!best || d < best.d) best = { d, x: b.left + b.width / 2, y: b.top + b.height / 2, top: b.top, bottom: b.bottom, left: b.left, right: b.right };
+      }
+    }
+    return best;
+  }, share);
+  const crosses = (a, b) => a && b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  for (const [label, size] of [['upright', { width: 390, height: 700 }], ['sideways', { width: 844, height: 340 }]]) {
+    await page.setViewportSize(size);
+    await wait(300);
+    for (const share of [0.15, 0.45, 0.8]) {
+      p = await near(share);
+      await hold(p);
+      L = await until(async () => { const l = await layer(); return l.shown && l.marks > 0 && l; }, 5000);
+      const where = label + ' at ' + Math.round(share * 100) + '%';
+      ok(L && !crosses(L.rect, L.kept), where + ': the card leaves the phrase and its readings in view');
+      ok(L && (L.rect.bottom <= p.y || L.rect.top >= p.y + 50 || L.rect.right <= p.left || L.rect.left >= p.right), where + ': the card is not under the fingertip');
+      if (label === 'sideways') ok(L && !crosses(L.rect, { left: p.x - 38, right: p.x + 38, top: p.y - 10, bottom: p.y + 110 }), where + ': nor where the thumb is');
+      await lift();
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.goto(SITE + 'plain.html');
+  await wait(300);
 
   step('a swipe still scrolls, a quick tap shows nothing');
   p = await at('#weather', '今');
@@ -415,6 +462,26 @@ async function main() {
   ok(L && scale < 0.9 && /scale\(1\.[0-9]|scale\([2-9]/.test(L.transform), 'zoomed out to ' + scale.toFixed(2) + ', the card is scaled back up: ' + (L && L.transform));
   const vw = await page.evaluate(() => [visualViewport.offsetLeft, visualViewport.width]);
   ok(L && L.rect.left >= vw[0] - 1 && L.rect.right <= vw[0] + vw[1] + 1, 'and fits across the screen');
+  await lift();
+
+  step('a tab coming back starts the engine again, before any touch');
+  await sw.evaluate(() => chrome.offscreen.closeDocument());
+  await wait(200);
+  ok(await contexts() === 0, 'the engine is closed (as Safari closes it after a while)');
+  await page.goto(SITE + 'plain.html');
+  /* the page's own start (a Japanese page opening) has come and gone before the engine is closed again */
+  await wait(1500);
+  await sw.evaluate(() => chrome.offscreen.closeDocument()).catch(() => {});
+  await wait(2200);
+  ok(await contexts() === 0, 'and stays closed while the page is left alone');
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  ok(await until(async () => (await contexts()) === 1, 1500), 'the page coming back on screen opens it again at once');
+  p = await at('#weather', '天');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && l; }, 5000);
+  ok(L && (/天気/.test(L.card) || /Loading the dictionary/.test(L.card)) && !/stays loaded/.test(L.card), 'a hold during the load says what is happening, truthfully: ' + (L && L.card.slice(0, 60)));
+  L = await until(async () => { const l = await layer(); return l.shown && /天気/.test(l.card) && l; }, 30000);
+  ok(L && /fine weather/.test(L.card), 'and then shows the word');
   await lift();
 
   step('the toolbar panel: switches');

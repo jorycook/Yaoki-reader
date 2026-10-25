@@ -60,7 +60,7 @@ function showState(st) {
     say(text, 'Dictionary: loading…');
     $('state-bar').style.width = Math.round(100 * (st.done || 0) / (st.total || 17)) + '%';
   } else if (st.state === 'failed') say(text, 'Dictionary: could not be loaded (' + (st.error || 'unknown error') + '). It is tried again at the next touch.');
-  else say(text, 'Dictionary: loads the first time you touch a word, or when a Japanese page opens (a few seconds).');
+  else say(text, 'Dictionary: not loaded. It loads when a Japanese page opens or a word is touched (a few seconds), and is let go when it has not been used for a while, to save memory.');
 }
 function poll() {
   api.runtime.sendMessage({ type: 'yaoki:status' }).then(function (st) {
