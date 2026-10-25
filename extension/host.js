@@ -38,7 +38,8 @@ function start() {
     }
   };
   worker.onerror = function (ev) { fail((ev && ev.message) || 'the engine stopped'); };
-  worker.postMessage({ type: 'init' });
+  /* the extension's build has the dictionary packed for it (tools/extension.py) */
+  worker.postMessage({ type: 'init', packed: true });
 }
 /* a failed load is tried again at the next lookup */
 function fail(message) {

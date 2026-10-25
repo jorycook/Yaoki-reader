@@ -19,6 +19,8 @@ They differ in their manifest and in where the engine is kept running, since it 
   Safari: a background page that is not persistent (the only kind iPhone allows); pages with Japanese on them keep
           it awake while they are open (content.js), and Safari before 18.4 needs its scripts marked as UTF-8.
 """
+import base64
+import gzip
 import json
 import os
 import shutil
@@ -91,6 +93,24 @@ def mark_utf8(folder):
                         fh.write(b'\xef\xbb\xbf' + data)
 
 
+def pack_dict(out):
+    """The tokenizer dictionary as the extension reads it: gzip binary (name.dat.gz) rather than the reader's base64
+    text, so the browser unpacks it itself, and without the zeros that pad most files (64.6 MB of real data in
+    100 MB): the tokenizer reads past a file's end as zeros anyway. One zero is kept, and each file stays a whole
+    number of 4-byte ints."""
+    os.makedirs(out)
+    for name in sorted(os.listdir(os.path.join(ENGINE, 'dict'))):
+        if not name.endswith('.dat.b64.txt'):
+            continue
+        with open(os.path.join(ENGINE, 'dict', name), encoding='ascii') as f:
+            raw = base64.b64decode(f.read())
+        if raw[:2] == b'\x1f\x8b':
+            raw = gzip.decompress(raw)
+        n = min(len(raw), (len(raw.rstrip(b'\0')) + 1 + 3) // 4 * 4)
+        with open(os.path.join(out, name[:-len('.b64.txt')] + '.gz'), 'wb') as f:
+            f.write(gzip.compress(raw[:n], 9, mtime=0))
+
+
 def build(name, shape, offscreen, bom):
     out = os.path.join(DIST, name)
     if os.path.exists(out):
@@ -106,7 +126,7 @@ def build(name, shape, offscreen, bom):
     os.makedirs(os.path.join(out, 'engine'))
     for item in ENGINE_FILES:
         copy(os.path.join(ENGINE, item), os.path.join(out, 'engine', item))
-    copy(os.path.join(ENGINE, 'dict'), os.path.join(out, 'engine', 'dict'))
+    pack_dict(os.path.join(out, 'engine', 'dict'))
     copy(os.path.join(TOP, 'docs', 'licenses.txt'), os.path.join(out, 'licenses.txt'))
     if bom:
         mark_utf8(out)

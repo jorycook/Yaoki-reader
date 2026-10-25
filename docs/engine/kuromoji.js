@@ -7642,22 +7642,30 @@ TokenInfoDictionary.prototype.loadPosVector = function (array_buffer) {
 
 // from tid_map.dat
 TokenInfoDictionary.prototype.loadTargetMap = function (array_buffer) {
-    var buffer = new ByteBuffer(array_buffer);
-    buffer.position = 0;
-    this.target_map = {};
-    buffer.readInt();  // map_keys_size
-    while (true) {
-        if (buffer.buffer.length < buffer.position + 1) {
-            break;
-        }
-        var key = buffer.readInt();
-        var map_values_size = buffer.readInt();
-        for (var i = 0; i < map_values_size; i++) {
-            var value = buffer.readInt();
-            this.addMapping(key, value);
-        }
+    /* Reader patch: the map is kept as the file's own numbers (keys size, then key, count, ids... for each key) with
+       where each key's count is, not as an object of over 300,000 small arrays, which took some 30 MB more and a
+       tenth of a second longer to make. A key with no ids (the zeros that pad a file) changes nothing. */
+    var ints = new Int32Array(array_buffer.buffer, array_buffer.byteOffset, array_buffer.byteLength >> 2);
+    var max = -1, p = 1;
+    while (p + 1 < ints.length) {
+        if (ints[p + 1] > 0 && ints[p] > max) { max = ints[p]; }
+        p += 2 + Math.max(0, ints[p + 1]);
     }
+    var at = new Int32Array(max + 1);
+    at.fill(-1);
+    for (p = 1; p + 1 < ints.length; p += 2 + Math.max(0, ints[p + 1])) {
+        if (ints[p + 1] > 0 && at[ints[p]] < 0) { at[ints[p]] = p + 1; }
+    }
+    this.target_ints = ints;
+    this.target_at = at;
     return this;
+};
+var NO_TARGETS = new Int32Array(0);
+// the token info ids for a key of the map (a trie id, or an unknown word's character class)
+TokenInfoDictionary.prototype.targets = function (key) {
+    var p = this.target_at && key < this.target_at.length ? this.target_at[key] : -1;
+    if (p < 0) { return NO_TARGETS; }
+    return this.target_ints.subarray(p + 1, p + 1 + this.target_ints[p]);
 };
 
 /**
@@ -8115,10 +8123,13 @@ BrowserDictionaryLoader.prototype = Object.create(DictionaryLoader.prototype);
  */
 BrowserDictionaryLoader.prototype.loadArrayBuffer = function (url, callback) {
     /* Reader patch: the dictionary files are published as base64 text (name.dat.b64.txt).
-       Decode, report the file, and gunzip when the bytes are gzip. */
+       Decode, report the file, and gunzip when the bytes are gzip. The browser extension ships them as gzip
+       binary (name.dat.gz, without their padding), which it asks for by setting __yomuDictBinary. */
+    var g = typeof self !== "undefined" ? self : window;
+    var binary = !!g.__yomuDictBinary;
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", url.replace(/\.dat\.gz$/, ".dat.b64.txt"), true);
-    xhr.responseType = "text";
+    xhr.open("GET", binary ? url : url.replace(/\.dat\.gz$/, ".dat.b64.txt"), true);
+    xhr.responseType = binary ? "arraybuffer" : "text";
     xhr.onload = function () {
         if (this.status > 0 && this.status !== 200) {
             callback(xhr.statusText || ("HTTP " + this.status), null);
@@ -8126,28 +8137,55 @@ BrowserDictionaryLoader.prototype.loadArrayBuffer = function (url, callback) {
         }
         var bytes;
         try {
-            var bin = atob(String(this.response).replace(/\s+/g, ""));
-            bytes = new Uint8Array(bin.length);
-            for (var i = 0; i < bin.length; i++) { bytes[i] = bin.charCodeAt(i); }
+            if (binary) {
+                bytes = new Uint8Array(this.response);
+            } else {
+                var bin = atob(String(this.response).replace(/\s+/g, ""));
+                bytes = new Uint8Array(bin.length);
+                for (var i = 0; i < bin.length; i++) { bytes[i] = bin.charCodeAt(i); }
+            }
         } catch (e) {
             callback("could not decode " + url, null);
             return;
         }
-        var g = typeof self !== "undefined" ? self : window;
         if (g.__yomuFile) { g.__yomuFile(url); }
-        if (bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
-            var gz = new zlib.Zlib.Gunzip(bytes);
-            var typed_array = gz.decompress();
-            callback(null, typed_array.buffer);
-        } else {
-            callback(null, bytes.buffer);
-        }
+        gunzip(bytes, url, callback);
     };
     xhr.onerror = function () {
         callback("network error", null);
     };
     xhr.send();
 };
+/* Reader patch: unpacked by the browser itself where it can (DecompressionStream), which is several times faster
+   than zlib.js; by zlib.js where it cannot. Bytes that are not gzip are passed on as they are. */
+function gunzip(bytes, url, callback) {
+    if (!(bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b)) {
+        callback(null, bytes.buffer);
+        return;
+    }
+    function inScript() {
+        var typed_array;
+        try {
+            typed_array = new zlib.Zlib.Gunzip(bytes).decompress();
+        } catch (e) {
+            callback("could not unpack " + url, null);
+            return;
+        }
+        callback(null, typed_array.buffer);
+    }
+    if (typeof DecompressionStream === "undefined" || typeof Response === "undefined" || typeof Blob === "undefined") {
+        inScript();
+        return;
+    }
+    var unpacking;
+    try {
+        unpacking = new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+    } catch (e) {
+        inScript();
+        return;
+    }
+    unpacking.then(function (buffer) { callback(null, buffer); }, inScript);
+}
 
 /**
  * Callback
@@ -8802,7 +8840,7 @@ ViterbiBuilder.prototype.build = function (sentence_str) {
             trie_id = vocabulary[n].v;
             key = vocabulary[n].k;
 
-            var token_info_ids = this.token_info_dictionary.target_map[trie_id];
+            var token_info_ids = this.token_info_dictionary.targets(trie_id);
             for (var i = 0; i < token_info_ids.length; i++) {
                 var token_info_id = parseInt(token_info_ids[i]);
 
@@ -8833,7 +8871,7 @@ ViterbiBuilder.prototype.build = function (sentence_str) {
                 }
             }
 
-            var unk_ids = this.unknown_dictionary.target_map[head_char_class.class_id];
+            var unk_ids = this.unknown_dictionary.targets(head_char_class.class_id);
             for (var j = 0; j < unk_ids.length; j++) {
                 var unk_id = parseInt(unk_ids[j]);
 
