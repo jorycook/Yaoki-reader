@@ -43,8 +43,11 @@ function plainKana(s) { return s.replace(/[ぁぃぅぇぉっゃゅょゎゐゑ]
    list by its first kanji form (or nothing) and first reading:
      =spelling TAB kanji TAB reading         one more way to write that word (顫える for 震える)
      ?kana TAB kanji TAB reading TAB score   how usual it is to write that word in that kana (0 to 20) */
-function Dict(lines) {
+function Dict(lines, index) {
   this.lines = lines;
+  /* the index made ahead of time from these same lines (packIndex, below), when there is one */
+  var made = index && unpackIndex(index, lines);
+  if (made) { this.idx = made[0]; this.alt = made[1]; this.kscore = made[2]; return; }
   var idx = new Map(), refs = [], ref = new Map(), kscore = new Map();
   function add(key, i) {
     if (!key) return;
@@ -105,6 +108,97 @@ Dict.prototype.alts = function () {
     });
   }
   return (this.alt = alt);
+};
+/* The index made ahead of time, for the browser extension (tools/jm-index.js): the three tables a Dict makes (idx,
+   alts, kscore) as sorted arrays in one buffer, so the engine need not make them at each start (a second on a
+   desktop, several on a phone). The buffer names the lines it was made from (how many, how many characters); for
+   other lines it is not used. 32-bit ints in the machine's own order (little-endian wherever this runs):
+     MAGIC, FORMAT, lines, characters, then for each table: keys, key characters, values;
+     then for each table: where each key starts (keys + 1), where its values start (keys + 1), the values (line
+     numbers), and for kscore the scores beside them;
+     then for each table its keys' characters, 16-bit, padded to a whole number of ints. */
+var INDEX_MAGIC = 0x58494b59, INDEX_FORMAT = 1;
+function countChars(lines) { var n = 0; for (var i = 0; i < lines.length; i++) n += lines[i].length; return n; }
+function packIndex(lines) {
+  var d = new Dict(lines);
+  d.alts();
+  var tables = [d.idx, d.alts(), d.kscore].map(function (map, t) {
+    var keys = Array.from(map.keys()).sort(), chars = 0, vals = 0;
+    keys.forEach(function (k) { var x = map.get(k); chars += k.length; vals += t === 2 ? x.size : typeof x === 'number' ? 1 : x.length; });
+    var o = { n: keys.length, chars: chars, vals: vals, ks: new Int32Array(keys.length + 1), vs: new Int32Array(keys.length + 1),
+      v: new Int32Array(vals), sc: t === 2 ? new Int32Array(vals) : null, kc: new Uint16Array(chars) };
+    var c = 0, j = 0;
+    keys.forEach(function (k, n) {
+      o.ks[n] = c;
+      for (var q = 0; q < k.length; q++) o.kc[c++] = k.charCodeAt(q);
+      o.vs[n] = j;
+      var x = map.get(k);
+      if (t === 2) x.forEach(function (score, line) { o.sc[j] = score; o.v[j++] = line; });
+      else (typeof x === 'number' ? [x] : x).forEach(function (line) { o.v[j++] = line; });
+    });
+    o.ks[keys.length] = c; o.vs[keys.length] = j;
+    return o;
+  });
+  var ints = 13, shorts = 0;
+  tables.forEach(function (o) { ints += 2 * (o.n + 1) + o.vals * (o.sc ? 2 : 1); shorts += o.chars + (o.chars & 1); });
+  var buf = new ArrayBuffer(ints * 4 + shorts * 2), I = new Int32Array(buf, 0, ints), at = 0;
+  I[at++] = INDEX_MAGIC; I[at++] = INDEX_FORMAT; I[at++] = lines.length; I[at++] = countChars(lines);
+  tables.forEach(function (o) { I[at++] = o.n; I[at++] = o.chars; I[at++] = o.vals; });
+  tables.forEach(function (o) {
+    I.set(o.ks, at); at += o.n + 1;
+    I.set(o.vs, at); at += o.n + 1;
+    I.set(o.v, at); at += o.vals;
+    if (o.sc) { I.set(o.sc, at); at += o.vals; }
+  });
+  var S = new Uint16Array(buf, ints * 4, shorts), sat = 0;
+  tables.forEach(function (o) { S.set(o.kc, sat); sat += o.chars + (o.chars & 1); });
+  return buf;
+}
+/* the three tables of a buffer packIndex made from these lines, or null */
+function unpackIndex(buf, lines) {
+  try {
+    var I = new Int32Array(buf, 0, 13);
+    if (I[0] !== INDEX_MAGIC || I[1] !== INDEX_FORMAT || I[2] !== lines.length || I[3] !== countChars(lines)) return null;
+    var at = 13 * 4, out = [0, 1, 2].map(function (t) {
+      /* the looser spellings' table (alts) holds a list for every key, even of one line, as Dict.alts makes it */
+      var n = I[4 + 3 * t], vals = I[6 + 3 * t], o = { n: n, lists: t === 1 };
+      o.ks = new Int32Array(buf, at, n + 1); at += (n + 1) * 4;
+      o.vs = new Int32Array(buf, at, n + 1); at += (n + 1) * 4;
+      o.v = new Int32Array(buf, at, vals); at += vals * 4;
+      o.sc = null;
+      if (t === 2) { o.sc = new Int32Array(buf, at, vals); at += vals * 4; }
+      return o;
+    });
+    out.forEach(function (o, t) { var chars = I[5 + 3 * t]; o.kc = new Uint16Array(buf, at, chars); at += (chars + (chars & 1)) * 2; });
+    return out.map(function (o) { return new Sorted(o); });
+  } catch (err) { return null; }
+}
+/* one of those tables: found by halving among keys sorted code unit by code unit; it answers as the Map did (a line
+   number or a list of them; for kscore, a Map from line to score) */
+function Sorted(o) { this.n = o.n; this.ks = o.ks; this.vs = o.vs; this.v = o.v; this.sc = o.sc; this.kc = o.kc; this.lists = o.lists; }
+Sorted.prototype.find = function (key) {
+  var lo = 0, hi = this.n - 1, ks = this.ks, kc = this.kc, len = key.length;
+  while (lo <= hi) {
+    var mid = (lo + hi) >> 1, a = ks[mid], b = ks[mid + 1], i = 0, cmp = 0;
+    while (true) {
+      if (i === len) { cmp = a + i === b ? 0 : -1; break; }
+      if (a + i === b) { cmp = 1; break; }
+      var x = key.charCodeAt(i), y = kc[a + i];
+      if (x !== y) { cmp = x < y ? -1 : 1; break; }
+      i++;
+    }
+    if (cmp === 0) return mid;
+    if (cmp < 0) hi = mid - 1; else lo = mid + 1;
+  }
+  return -1;
+};
+Sorted.prototype.has = function (key) { return this.find(key) >= 0; };
+Sorted.prototype.get = function (key) {
+  var k = this.find(key);
+  if (k < 0) return undefined;
+  var a = this.vs[k], b = this.vs[k + 1];
+  if (this.sc) { var m = new Map(); for (var q = a; q < b; q++) m.set(this.v[q], this.sc[q]); return m; }
+  return b - a === 1 && !this.lists ? this.v[a] : Array.prototype.slice.call(this.v.subarray(a, b));
 };
 Dict.prototype.has = function (key) { return this.idx.has(key) || (hasKanji(key) && this.alts().has(key)); };
 Dict.prototype.entries = function (key) {
@@ -1225,9 +1319,10 @@ function clsOf(t) {
 }
 
 /* kanji: lines of kanji.txt (a kanji, a tab, its meanings), for kanji no word explains */
-function Engine(tokenizer, lines, kanji) {
+/* index: the word index made ahead of time (packIndex), which the browser extension carries; may be left out */
+function Engine(tokenizer, lines, kanji, index) {
   this.tokenizer = tokenizer;
-  this.dict = new Dict(lines);
+  this.dict = new Dict(lines, index);
   var km = this.kanji = new Map();
   (kanji || []).forEach(function (l) { var t = l.indexOf('\t'); if (t > 0) km.set(l.slice(0, t), l.slice(t + 1)); });
 }
@@ -1622,6 +1717,6 @@ Engine.prototype.analyze = function (text, ruby) {
   return { v: VERSION, paras: clean };
 };
 
-root.YomuEngine = { VERSION: VERSION, create: function (tokenizer, lines, kanji) { return new Engine(tokenizer, lines, kanji); }, furi: furi, romaji: romaji };
+root.YomuEngine = { VERSION: VERSION, create: function (tokenizer, lines, kanji, index) { return new Engine(tokenizer, lines, kanji, index); }, furi: furi, romaji: romaji, packIndex: packIndex };
 if (typeof module !== 'undefined' && module.exports) module.exports = root.YomuEngine;
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

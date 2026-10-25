@@ -33,7 +33,7 @@ The toolbar button opens a panel: switch it off everywhere or for one site, choo
 python3 tools/extension.py           # builds dist/chrome, dist/firefox, dist/safari and a zip of each
 ```
 
-The engine and dictionary are the reader's (`docs/engine/`), copied in by the build, so there is one copy of them in the repository. Each zip is about 23 MB.
+The engine and dictionary are the reader's (`docs/engine/`), copied in by the build, so there is one copy of them in the repository. Two parts are packed for the extension as they are copied, so the engine starts in under a second on a computer (three times faster than the reader's files allow, and holding about 60 MB less): the tokenizer's dictionary as gzip binary without its padding, which the browser unpacks itself, and the engine's word index made ahead of time (`tools/jm-index.js`, by the engine's own code), which the engine would otherwise make at each start. Each zip is about 29 MB.
 
 - **Chrome, Edge, Brave, Vivaldi on a computer:** open `chrome://extensions`, switch on Developer mode, **Load unpacked**, and pick `dist/chrome`. `dist/yaoki-reader-chrome.zip` is what the Chrome Web Store and Edge Add-ons take. Chrome for Android has no extensions; Vivaldi for Android (8.2 and later) installs them from the Chrome Web Store, and so do some smaller Android browsers.
 - **Firefox on a computer:** `about:debugging` → This Firefox → **Load Temporary Add-on** → `dist/firefox/manifest.json` (it stays until Firefox closes). To keep it, upload `dist/yaoki-reader-firefox.zip` to addons.mozilla.org, listed or unlisted (just for yourself), which signs it.
@@ -54,7 +54,7 @@ The site is `docs/`, served by GitHub Pages (Settings → Pages → Deploy from 
 | `docs/sw.js` | The offline copy: the page and the engine's scripts fresh from the network when there is one, the dictionary kept on the device. If the dictionary's files are ever replaced, change `ENGINE` in it. |
 | `docs/manifest.webmanifest`, `docs/icons/` | Home-screen name and icons (Yaoki's daruma on the reader's blue, drawn by `tools/icons.mjs`). |
 | `docs/engine/analyzer.js` | Phrases, readings, glosses and grammar notes (analysis version 6). Texts analysed by an earlier version are analysed again when next opened. Besides the tokenizer's words it mends what the tokenizer gets wrong (unknown kanji, old spellings, runs of hiragana), reads Aozora's furigana, and has a chain of fallbacks for words the dictionary lacks. `KANA` and `GLOSS` near the top hold the choices for common words written in kana, checked against real texts. |
-| `docs/engine/kuromoji.js`, `engine/dict/` | kuromoji.js 0.1.2 and the IPA dictionary, its loader changed to read the dictionary as base64 text. |
+| `docs/engine/kuromoji.js`, `engine/dict/` | kuromoji.js 0.1.2 and the IPA dictionary, its loader changed to read the dictionary as base64 text (or, for the extension, as gzip binary), unpacked by the browser where it can, and its target map kept as numbers. |
 | `docs/engine/jm-1.txt`, `jm-2.txt` | A shortened JMdict word list (2020 edition, from the `jamdict-data` 1.5 package). |
 | `docs/engine/jm-3.txt` | The supplement from a newer JMdict: words added since 2020, more spellings of the list's words, how usual it is to write each word in kana. Made by `tools/jm-supplement.py`; after remaking it, change `SUPPLEMENT` in `sw.js`. |
 | `docs/engine/kanji.txt` | English meanings of single kanji from KANJIDIC2, made by `tools/kanji-meanings.py`. |
@@ -65,7 +65,7 @@ The site is `docs/`, served by GitHub Pages (Settings → Pages → Deploy from 
 | `extension/content.js`, `content.css` | The extension on each page: the touch, mouse and Shift gestures; the character under the finger and the sentence around it (with the page's own ruby); the phrase it is in, from the engine; the readings over the kanji, the mark and the card, drawn in a layer of their own (a closed shadow root) so the page is not changed. |
 | `extension/background.js`, `host.js`, `host.html`, `host-offscreen.js` | Pass lookups to the one engine for all tabs (`docs/engine/worker.js`) and keep it running: in Chrome's offscreen document (`host.html`), or in the background page in Firefox and Safari. |
 | `extension/popup.html`, `popup.js`, `manifest.json`, `icons/` | The toolbar panel (settings kept in the browser's extension storage), the manifest the three builds are made from, and the icons (drawn by `tools/icons.mjs`). |
-| `tools/` | `aozora-catalog.py` (remakes the catalog), `jm-supplement.py`, `kanji-meanings.py`, `jisx0213-table.py`, `icons.mjs`, `extension.py` (builds the extension into `dist/`). |
+| `tools/` | `aozora-catalog.py` (remakes the catalog), `jm-supplement.py`, `kanji-meanings.py`, `jisx0213-table.py`, `icons.mjs`, `extension.py` (builds the extension into `dist/`), `jm-index.js` (the extension's word index made ahead of time). |
 | `check/` | The tests (Playwright; Selenium for the extension in Firefox). |
 
 To bring the catalog up to date with Aozora Bunko:
@@ -90,7 +90,8 @@ bash run.sh aozora-test.js    # Aozora Bunko: search, fetch, parts, a downloaded
 The extension, built first by the tests themselves:
 
 ```
-node extension-test.js        # Chromium with the extension: holding, sliding, letting go, swipes and links, mouse and Shift, ruby, vertical text, strict CSP, the panel
+node extension-test.js        # Chromium with the extension: holding, sliding, letting go, swipes and links, mouse and Shift, ruby, vertical text, strict CSP, where the card goes, the panel
+node dict-test.js             # the extension's packed dictionary and word index against the reader's: the same tokens and analyses (two minutes)
 FIREFOX=<firefox> GECKODRIVER=<geckodriver> python3 extension-firefox-test.py   # the Firefox build in Firefox (needs Selenium and Pillow)
 ```
 

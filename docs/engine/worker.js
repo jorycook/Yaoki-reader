@@ -1,11 +1,12 @@
 /* Runs the reader engine off the main thread. */
 importScripts('kuromoji.js', 'analyzer.js', 'boot.js');
 var engine = null, starting = null;
-/* packed: the browser extension's own copy of the files (the tokenizer dictionary as gzip binary) */
+/* packed: the browser extension's own copy of the files (the tokenizer dictionary as gzip binary, and the word
+   index made ahead of time) */
 function start(packed) {
   if (packed) self.__yomuDictBinary = true;
   if (!starting) {
-    starting = self.YomuBoot('', function (done, total) { self.postMessage({ type: 'progress', done: done, total: total }); })
+    starting = self.YomuBoot('', function (done, total) { self.postMessage({ type: 'progress', done: done, total: total }); }, { index: !!packed })
       .then(function (e) { engine = e; self.postMessage({ type: 'ready', version: self.YomuEngine.VERSION }); })
       .catch(function (err) { starting = null; self.postMessage({ type: 'error', message: String((err && err.message) || err) }); });
   }

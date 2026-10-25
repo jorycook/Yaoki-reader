@@ -21,9 +21,11 @@ They differ in their manifest and in where the engine is kept running, since it 
 """
 import base64
 import gzip
+import hashlib
 import json
 import os
 import shutil
+import subprocess
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -93,6 +95,38 @@ def mark_utf8(folder):
                         fh.write(b'\xef\xbb\xbf' + data)
 
 
+def fingerprint(files):
+    digest = hashlib.sha256()
+    for f in files:
+        with open(f, 'rb') as fh:
+            digest.update(fh.read())
+    return digest.hexdigest()
+
+
+def made_from(out, files):
+    """Whether out was made from these very files (it is kept with their fingerprint), so that it need not be made
+    again: packing the dictionary and making the index take some seconds each."""
+    stamp = out + '.from'
+    return os.path.exists(out) and os.path.exists(stamp) and open(stamp).read() == fingerprint(files)
+
+
+def stamp_from(out, files):
+    with open(out + '.from', 'w') as fh:
+        fh.write(fingerprint(files))
+
+
+def packed_dict():
+    """pack_dict once for all builds, in dist/dict."""
+    out = os.path.join(DIST, 'dict')
+    files = [os.path.join(ENGINE, 'dict', n) for n in sorted(os.listdir(os.path.join(ENGINE, 'dict')))] + [os.path.abspath(__file__)]
+    if not made_from(out, files):
+        if os.path.exists(out):
+            shutil.rmtree(out)
+        pack_dict(out)
+        stamp_from(out, files)
+    return out
+
+
 def pack_dict(out):
     """The tokenizer dictionary as the extension reads it: gzip binary (name.dat.gz) rather than the reader's base64
     text, so the browser unpacks it itself, and without the zeros that pad most files (64.6 MB of real data in
@@ -111,7 +145,18 @@ def pack_dict(out):
             f.write(gzip.compress(raw[:n], 9, mtime=0))
 
 
-def build(name, shape, offscreen, bom):
+def make_index():
+    """The engine's word index made ahead of time (tools/jm-index.js, by the engine's own code), once for all
+    builds."""
+    out = os.path.join(DIST, 'jm-index.bin.gz')
+    files = [os.path.join(ENGINE, f) for f in ('analyzer.js', 'jm-1.txt', 'jm-2.txt', 'jm-3.txt')] + [os.path.join(HERE, 'jm-index.js')]
+    if not made_from(out, files):
+        subprocess.run(['node', os.path.join(HERE, 'jm-index.js'), out], check=True)
+        stamp_from(out, files)
+    return out
+
+
+def build(name, shape, offscreen, bom, index, dict_dir):
     out = os.path.join(DIST, name)
     if os.path.exists(out):
         shutil.rmtree(out)
@@ -126,7 +171,8 @@ def build(name, shape, offscreen, bom):
     os.makedirs(os.path.join(out, 'engine'))
     for item in ENGINE_FILES:
         copy(os.path.join(ENGINE, item), os.path.join(out, 'engine', item))
-    pack_dict(os.path.join(out, 'engine', 'dict'))
+    copy(dict_dir, os.path.join(out, 'engine', 'dict'))
+    copy(index, os.path.join(out, 'engine', 'jm-index.bin.gz'))
     copy(os.path.join(TOP, 'docs', 'licenses.txt'), os.path.join(out, 'licenses.txt'))
     if bom:
         mark_utf8(out)
@@ -146,8 +192,9 @@ def pack(folder, zip_path):
 
 def main():
     os.makedirs(DIST, exist_ok=True)
+    index, dict_dir = make_index(), packed_dict()
     for name, shape, offscreen, bom in TARGETS:
-        folder, version = build(name, shape, offscreen, bom)
+        folder, version = build(name, shape, offscreen, bom, index, dict_dir)
         zip_path = os.path.join(DIST, 'yaoki-reader-%s.zip' % name)
         pack(folder, zip_path)
         print('dist/%s/  dist/%s (%.1f MB)  version %s' % (name, os.path.basename(zip_path), os.path.getsize(zip_path) / 1e6, version))
