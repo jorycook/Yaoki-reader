@@ -10,14 +10,14 @@ The extension makes no network requests of its own. Its dictionary files are bun
 
 ## What it keeps
 
-- **Settings:** whether it is on, the sites you have switched it off for, which of furigana, meanings and grammar notes to show, and how long a hold takes. These are kept in your browser's extension storage, on your device only.
+- **Settings:** whether it is on, the sites you have switched it off for, which of furigana, meanings and grammar notes to show, whether to keep the list below, and how long a hold takes. These are kept in your browser's extension storage, on your device only.
 - **The words you look up,** when the "Keep a list of what I look up" switch is on (it is on at first): each word with its reading and meaning, the sentence it was in, and the title and address of the page, kept in your browser's extension storage on your device only, at most 1,500 words. You can see the list from the toolbar panel, delete any entry or all of them, and save it as a file for Anki. Nothing is kept in private windows. Uninstalling the extension deletes the list.
 
 It keeps no account and no identifier. It sets no cookies and uses no analytics.
 
 ## Permissions
 
-- **Read and change data on all websites** (content script on all sites): so that a touch on any page can find the word under your finger and show its reading. The extension changes nothing on the page; readings and the card are drawn in a layer of its own above it.
+- **Read and change all your data on all websites** (the browser's words for a content script on all sites): so that a touch on any page can find the word under your finger and show its reading. The extension changes nothing on the page; readings and the card are drawn in a layer of its own above it.
 - **Storage:** for the settings and the list above.
 - **Offscreen documents** (Chrome and Edge only): to keep the dictionary loaded in the background between lookups.
 
@@ -29,4 +29,4 @@ None.
 
 Questions about this statement: open an issue at https://github.com/jorycook/Yaoki-reader.
 
-This statement applies to Yaoki Reader as published from this repository. Last updated 2026-10-26.
+This statement applies to Yaoki Reader as published from this repository. It is published at https://jorycook.github.io/Yaoki-reader/privacy.html (docs/privacy.html, the same text). Last updated 2026-10-26.

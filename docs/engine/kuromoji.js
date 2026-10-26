@@ -8127,8 +8127,10 @@ BrowserDictionaryLoader.prototype.loadArrayBuffer = function (url, callback) {
        binary (name.dat.gz, without their padding), which it asks for by setting __yomuDictBinary. */
     var g = typeof self !== "undefined" ? self : window;
     var binary = !!g.__yomuDictBinary;
+    /* __yomuDictPlain: the binary files not packed at all (name.dat), for a store that takes no packed files */
+    var name = binary ? (g.__yomuDictPlain ? url.replace(/\.gz$/, "") : url) : url.replace(/\.dat\.gz$/, ".dat.b64.txt");
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", binary ? url : url.replace(/\.dat\.gz$/, ".dat.b64.txt"), true);
+    xhr.open("GET", name, true);
     xhr.responseType = binary ? "arraybuffer" : "text";
     xhr.onload = function () {
         if (this.status > 0 && this.status !== 200) {

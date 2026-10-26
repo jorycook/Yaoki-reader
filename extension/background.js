@@ -19,7 +19,7 @@ function openHost() {
       return chrome.offscreen.createDocument({
         url: 'host.html',
         reasons: ['WORKERS'],
-        justification: 'Runs the Japanese tokenizer and dictionary in a worker shared by all tabs, so they load once.',
+        justification: 'Keeps the 40 MB Japanese dictionary and tokenizer loaded in a worker between lookups, shared by all tabs, so each lookup answers at once.',
       });
     }).catch(function (err) {
       /* opened in the meantime by another lookup */

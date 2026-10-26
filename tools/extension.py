@@ -7,6 +7,8 @@ The extension's own files are in extension/; the engine and its dictionary are t
 time so there is one copy of them in the repository. Each browser gets a folder and a zip:
   dist/chrome/   dist/yaoki-reader-chrome.zip    Chrome, Edge and other Chromium browsers (Load unpacked, or the zip
                                                  for the Chrome Web Store and Edge Add-ons)
+  dist/edge/     dist/yaoki-reader-edge.zip      Edge Add-ons: the Chrome build with the dictionary files not packed,
+                                                 since that store refuses a package holding packed files
   dist/firefox/  dist/yaoki-reader-firefox.zip   Firefox and Firefox for Android (about:debugging, or the zip for
                                                  addons.mozilla.org, which signs it)
   dist/safari/   dist/yaoki-reader-safari.zip    Safari on a Mac, iPhone and iPad, made into an app by Xcode
@@ -24,6 +26,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import zipfile
@@ -72,8 +75,8 @@ def safari(m):
     return m
 
 
-# name, manifest, the offscreen document's files, a byte order mark on scripts
-TARGETS = [('chrome', chrome, True, False), ('firefox', firefox, False, False), ('safari', safari, False, True)]
+# name, manifest, the offscreen document's files, a byte order mark on scripts, the dictionary files not packed
+TARGETS = [('chrome', chrome, True, False, False), ('edge', chrome, True, False, True), ('firefox', firefox, False, False, False), ('safari', safari, False, True, False)]
 
 
 def copy(src, dst):
@@ -171,13 +174,26 @@ def make_index():
     return out
 
 
-def build(name, shape, offscreen, bom, index, dict_dir):
+def unpack_into(src, dst):
+    with open(src, 'rb') as f:
+        data = f.read()
+    with open(dst, 'wb') as f:
+        f.write(gzip.decompress(data))
+
+
+def build(name, shape, offscreen, bom, plain, index, dict_dir):
     out = os.path.join(DIST, name)
     if os.path.exists(out):
         shutil.rmtree(out)
     os.makedirs(out)
     with open(os.path.join(SRC, 'manifest.json'), encoding='utf-8') as f:
         manifest = shape(json.load(f))
+    # the stores read the name and summary from the manifest; Edge's refuses a listing that names other browsers
+    for field in ('name', 'description'):
+        if re.search(r'chrome|firefox|safari|edge|update_url', manifest[field], re.I):
+            raise SystemExit('manifest %s must not name a browser: %r' % (field, manifest[field]))
+    if 'update_url' in manifest:
+        raise SystemExit('the stores refuse a manifest with update_url')
     with open(os.path.join(out, 'manifest.json'), 'w', encoding='utf-8') as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
         f.write('\n')
@@ -186,9 +202,22 @@ def build(name, shape, offscreen, bom, index, dict_dir):
     os.makedirs(os.path.join(out, 'engine'))
     for item in ENGINE_FILES:
         copy(os.path.join(ENGINE, item), os.path.join(out, 'engine', item))
-    copy(dict_dir, os.path.join(out, 'engine', 'dict'))
-    if index:
-        copy(index, os.path.join(out, 'engine', 'jm-index.bin.gz'))
+    if plain:
+        os.makedirs(os.path.join(out, 'engine', 'dict'))
+        for f in sorted(os.listdir(dict_dir)):
+            if f.endswith('.dat.gz'):
+                unpack_into(os.path.join(dict_dir, f), os.path.join(out, 'engine', 'dict', f[:-3]))
+        if index:
+            unpack_into(index, os.path.join(out, 'engine', 'jm-index.bin'))
+        with open(os.path.join(out, 'host.js'), encoding='utf-8') as f:
+            host = f.read()
+        assert host.count('var PLAIN = false;') == 1
+        with open(os.path.join(out, 'host.js'), 'w', encoding='utf-8') as f:
+            f.write(host.replace('var PLAIN = false;', 'var PLAIN = true;'))
+    else:
+        copy(dict_dir, os.path.join(out, 'engine', 'dict'))
+        if index:
+            copy(index, os.path.join(out, 'engine', 'jm-index.bin.gz'))
     copy(os.path.join(TOP, 'docs', 'licenses.txt'), os.path.join(out, 'licenses.txt'))
     if bom:
         mark_utf8(out)
@@ -215,8 +244,8 @@ def pack(folder, zip_path):
 def main():
     os.makedirs(DIST, exist_ok=True)
     index, dict_dir = make_index(), packed_dict()
-    for name, shape, offscreen, bom in TARGETS:
-        folder, version = build(name, shape, offscreen, bom, index, dict_dir)
+    for name, shape, offscreen, bom, plain in TARGETS:
+        folder, version = build(name, shape, offscreen, bom, plain, index, dict_dir)
         zip_path = os.path.join(DIST, 'yaoki-reader-%s.zip' % name)
         pack(folder, zip_path)
         print('dist/%s/  dist/%s (%.1f MB)  version %s' % (name, os.path.basename(zip_path), os.path.getsize(zip_path) / 1e6, version))

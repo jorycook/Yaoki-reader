@@ -1,10 +1,12 @@
 /* Loads the tokenizer and the dictionary, then hands back a ready engine.
    base is '' inside the worker and 'engine/' on the page. opts.index: load the word index made ahead of time
-   (jm-index.bin.gz, which the browser extension's build has) instead of making it at start. */
+   (jm-index.bin.gz, which the browser extension's build has; jm-index.bin, not packed, when opts.plain) instead
+   of making it at start. */
 (function (root) {
 'use strict';
 root.YomuBoot = function (base, onProgress, opts) {
-  var withIndex = !!(opts && opts.index) && typeof DecompressionStream !== 'undefined';
+  var plain = !!(opts && opts.plain);
+  var withIndex = !!(opts && opts.index) && (plain || typeof DecompressionStream !== 'undefined');
   var done = 0, total = withIndex ? 18 : 17;
   function step() { done++; if (onProgress) onProgress(done, total); }
   root.__yomuFile = step;
@@ -22,7 +24,7 @@ root.YomuBoot = function (base, onProgress, opts) {
   /* the index unpacked by the browser (unless it has done so already); on any trouble the engine makes its own */
   function index() {
     if (!withIndex) return Promise.resolve(null);
-    return fetch(base + 'jm-index.bin.gz').then(function (r) {
+    return fetch(base + (plain ? 'jm-index.bin' : 'jm-index.bin.gz')).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.arrayBuffer();
     }).then(function (buf) {

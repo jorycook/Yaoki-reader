@@ -1,14 +1,16 @@
 # Yaoki Reader: store listing text
 
-The same text for every store, cut to each one's limits (noted beside each field). Paste as is.
+The same text for every store, cut to each one's limits (noted beside each field). Paste as is. What each store needs, and in what order, is at the end.
 
 ## Name
 
-Yaoki Reader
+Yaoki Reader (Chrome and Edge read it from the manifest's `name`, which cannot be edited in their dashboards: to change it, change the manifest, raise `version`, upload again.)
 
-## Summary (one line; Chrome 132 characters, Firefox 250, Edge 250)
+## Summary (one line)
 
-Touch a Japanese word on any page and hold it to see its reading and meaning. Readings over the kanji, a card with each word's meaning; let go and it hides.
+Touch a Japanese word on any page and hold it to see its reading over the kanji and each word's meaning; let go and it hides.
+
+(The manifest's `description`, which is what Chrome shows under the title, 132 characters at most, and what Edge shows as the short description; Firefox and the App Store take the same line typed in. Like the name, it is changed only through the manifest.)
 
 ## Description
 
@@ -26,7 +28,11 @@ Yaoki Reader is the companion of the Yaoki Reader app (https://jorycook.github.i
 
 ## Category
 
-Chrome Web Store: Education (or Tools). Edge Add-ons: Education. Firefox: Language Support (or Search Tools). App Store: Education, secondary Reference.
+Chrome Web Store: Education (under Productivity), language English. Edge Add-ons: Productivity (its list has no Education; Accessibility or Search tools otherwise; check the dropdown at submission). Firefox: Language Support (or Search Tools). App Store: Education, secondary Reference.
+
+## Links (the dashboards' optional fields)
+
+Homepage: https://jorycook.github.io/Yaoki-reader/ (also the manifest's `homepage_url`). Support: https://github.com/jorycook/Yaoki-reader/issues. Privacy statement: https://jorycook.github.io/Yaoki-reader/privacy.html (give it even where nothing is collected; it saves a reviewer's question). Mature content: no.
 
 ## Keywords (App Store, 100 characters)
 
@@ -44,11 +50,19 @@ Shows the reading and meaning of the Japanese word the user touches or points at
 
 ## Remote code
 
-None. All code and data is in the package. No scripts, modules or WebAssembly are loaded from the web, and no data is fetched.
+None ("No, I am not using remote code"). All code and data is in the package. No scripts, modules or WebAssembly are loaded from the web, and no data is fetched: engine/worker.js's importScripts() and kuromoji.js's XMLHttpRequest load only files inside the package (engine/*.js, engine/dict/*). The dictionary files (engine/dict/*.dat.gz, engine/jm-index.bin.gz; unpacked .dat and .bin in the Edge build) are data, not code.
 
 ## Data use (Chrome's certification, Apple's App Privacy)
 
-No data collected. No personal communications, financial, health, location, authentication, personal, or web-history data is collected, transmitted or sold. Apple: "Data Not Collected".
+No data collected: tick none of the data-type boxes, and tick all three certifications (not sold, used only for the single purpose, not used for creditworthiness or lending), which are compulsory; the listing then says "The developer has disclosed that it will not collect or use your data". Apple: "Data Not Collected". The list of looked-up words is kept on the device at the user's choice and never transmitted, which Chrome's policy counts as local handling of website content: say so in the privacy statement (done) and keep the in-panel line "nothing you read is sent anywhere".
+
+## Trader declaration (Chrome, EU)
+
+Non-trader: a free personal project outside any trade or profession, nothing sold. Say the same on Edge and Firefox.
+
+## Test instructions (Chrome's optional tab; Edge's notes for certification)
+
+Open a page with Japanese text on it (for example https://jorycook.github.io/Yaoki-reader/ and the sample text there, or any Japanese news page). The first time, the dictionary loads for a few seconds (the toolbar panel shows "Dictionary: loading"). Then hold the mouse button down on a Japanese word for a quarter of a second, or hold Shift and point at one; on a touch screen, touch a word and keep your finger on it. The word's reading appears over the kanji, the phrase is marked, and a card above it shows each word's meaning. Let go and it hides. No account, no sign-in, no network.
 
 ## Notes to the reviewer (Firefox; also useful elsewhere)
 
@@ -67,3 +81,12 @@ The Firefox build is Manifest V2 with a persistent background page because the e
 ## What's new (version 1.0.0)
 
 First release.
+
+## Each store, in order
+
+Chrome first: Edge takes the same text, and the App Store and Firefox the same statement.
+
+1. **Chrome Web Store.** A Google account kept for good (its address cannot be changed later), 2-step verification on, the one-time US$5 fee, a verified contact address, the non-trader declaration. Upload `dist/yaoki-reader-chrome.zip`. Store listing: the description above, Education, the icon from the package (128 px), three to five screenshots of 1280×800 (`store/screenshots/desktop-*.png`), the small promo tile `store/promo/small-440x280.png` (listings without one come after those with), the marquee tile if wanted. Privacy practices: single purpose, the three justifications, "No" to remote code, no data collected, the privacy statement's address. Distribution: public, all regions, free. A first review with access to all sites and a new account can take one to three weeks.
+2. **Edge Add-ons.** A Microsoft or GitHub account, no fee; Partner Center, Individual. Upload `dist/yaoki-reader-edge.zip`, never the Chrome one: Edge's store refuses a package holding packed files, so the Edge build carries its dictionary unpacked (29.7 MB zip). Name and short description come from the manifest. Properties: Productivity; the privacy statement's address; the same justifications. The listing must not name other browsers (the manifest and this text do not). Certification takes up to seven working days.
+3. **Firefox (addons.mozilla.org).** See "Notes to the reviewer". Listed, or unlisted for a signed file of your own. `dist/yaoki-reader-firefox.zip`, with the source as the notes say.
+4. **Safari (App Store Connect).** The Safari Web Extension Packager takes `dist/yaoki-reader-safari.zip`; the app icon is `store/icons/app-icon-1024.png`; "Data Not Collected"; the privacy statement's address is required for every app.

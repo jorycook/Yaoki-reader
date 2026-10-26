@@ -43,13 +43,30 @@ for (const [size, share] of [[16, 0.86], [32, 0.82], [48, 0.78], [128, 0.72]]) {
   fs.writeFileSync(path.join(EXT, `icon-${size}.png`), await sharp(Buffer.from(icon(1024, share))).resize(size, size).png({ compressionLevel: 9 }).toBuffer());
 }
 console.log('extension icons written to', EXT);
-/* the stores' (store/icons/): the listings' icons, and the App Store's app icon, which must be opaque (no alpha)
-   and 1024 px, in sRGB */
+/* The stores' (store/icons/): the listings' icons as a rounded square with a clear margin round it (the Chrome Web
+   Store asks for the mark within 96 px of the 128, on a clear ground, so it sits well on light and dark pages), the
+   App Store's app icon, which must be opaque (no alpha), 1024 px and square-cornered (iOS rounds it), and the
+   promotional tiles (store/promo/): the daruma on its ground, no words, which the Chrome Web Store shows beside a
+   listing (440x280) and in its marquee (1400x560). */
+const rounded = (size, inner, share) => {
+  const d = inner * share, k = d / 100, x = (size - d) / 2 - 1.5 * k, y = (size - d) / 2 - 1.5 * k, m = (size - inner) / 2, r = inner * 0.22;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect x="${m}" y="${m}" width="${inner}" height="${inner}" rx="${r}" fill="${GROUND}"/><g transform="translate(${x} ${y}) scale(${k})">${DARUMA(true)}</g></svg>`;
+};
 const STORE = path.join(HERE, '..', 'store', 'icons');
 fs.mkdirSync(STORE, { recursive: true });
-for (const [name, size, share, alpha] of [['icon-64.png', 64, 0.76, true], ['icon-128.png', 128, 0.72, true], ['icon-300.png', 300, 0.7, true], ['icon-512.png', 512, 0.7, true], ['app-icon-1024.png', 1024, 0.7, false]]) {
-  let img = sharp(Buffer.from(icon(1024, share))).resize(size, size);
-  if (!alpha) img = img.flatten({ background: GROUND }).removeAlpha();
-  fs.writeFileSync(path.join(STORE, name), await img.png({ compressionLevel: 9 }).toBuffer());
+for (const [name, size] of [['icon-64.png', 64], ['icon-128.png', 128], ['icon-300.png', 300], ['icon-512.png', 512]]) {
+  fs.writeFileSync(path.join(STORE, name), await sharp(Buffer.from(rounded(1024, 768, 0.78))).resize(size, size).png({ compressionLevel: 9 }).toBuffer());
 }
-console.log('store icons written to', STORE);
+fs.writeFileSync(path.join(STORE, 'app-icon-1024.png'), await sharp(Buffer.from(icon(1024, 0.7))).flatten({ background: GROUND }).removeAlpha().png({ compressionLevel: 9 }).toBuffer());
+/* the Chrome Web Store shows the 128 px icon from the package in its listing: the same rounded one there */
+fs.copyFileSync(path.join(STORE, 'icon-128.png'), path.join(EXT, 'icon-128.png'));
+const PROMO = path.join(HERE, '..', 'store', 'promo');
+fs.mkdirSync(PROMO, { recursive: true });
+const tile = (w, h) => {
+  const d = h * 0.72, k = d / 100, x = (w - d) / 2 - 1.5 * k, y = (h - d) / 2 - 1.5 * k;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="${GROUND}"/><g transform="translate(${x} ${y}) scale(${k})">${DARUMA(true)}</g></svg>`;
+};
+for (const [name, w, h] of [['small-440x280.png', 440, 280], ['marquee-1400x560.png', 1400, 560]]) {
+  fs.writeFileSync(path.join(PROMO, name), await sharp(Buffer.from(tile(w * 2, h * 2))).resize(w, h).flatten({ background: GROUND }).removeAlpha().png({ compressionLevel: 9 }).toBuffer());
+}
+console.log('store icons and promotional tiles written to', STORE, 'and', PROMO);

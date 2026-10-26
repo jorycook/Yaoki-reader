@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "Yaoki Reader",
   "version": "1.0.0",
-  "description": "Touch a Japanese word on any page and hold it to see its reading and meaning; let go and it hides again.",
+  "description": "Touch a Japanese word on any page and hold it to see its reading over the kanji and each word's meaning; let go and it hides.",
+  "homepage_url": "https://jorycook.github.io/Yaoki-reader/",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

@@ -9,7 +9,8 @@ const { execFileSync } = require('child_process');
 const { chromium } = require('playwright');
 
 const TOP = path.join(__dirname, '..');
-const EXT = path.join(TOP, 'dist', 'chrome');
+/* EXT_DIR=dist/edge runs the same checks on the Edge build (the dictionary files unpacked) */
+const EXT = process.env.EXT_DIR ? path.resolve(process.env.EXT_DIR) : path.join(TOP, 'dist', 'chrome');
 const SITE = 'http://yaoki.test/';
 let fails = 0;
 const ok = (cond, msg) => { console.log((cond ? '  ok: ' : '  FAIL: ') + msg); if (!cond) fails += 1; return cond; };

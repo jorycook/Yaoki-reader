@@ -1,4 +1,4 @@
-# On a version tag (v1.0.0): builds the extension's three packages and attaches them to a GitHub release of that
+# On a version tag (v1.0.0): builds the extension's four packages and attaches them to a GitHub release of that
 # tag, with their checksums. The tag must match the version in extension/manifest.json.
 # To release: bump "version" in extension/manifest.json, commit, then
 #   git tag v1.0.0 && git push origin v1.0.0
@@ -32,13 +32,15 @@ jobs:
         with:
           files: |
             dist/yaoki-reader-chrome.zip
+            dist/yaoki-reader-edge.zip
             dist/yaoki-reader-firefox.zip
             dist/yaoki-reader-safari.zip
             dist/SHA256SUMS
           body: |
             Yaoki Reader ${{ github.ref_name }}: the browser extension, built from this tag by `python3 tools/extension.py`.
 
-            - `yaoki-reader-chrome.zip`: Chrome, Edge and other Chromium browsers (and the Chrome Web Store, Edge Add-ons)
+            - `yaoki-reader-chrome.zip`: Chrome and other Chromium browsers (and the Chrome Web Store)
+            - `yaoki-reader-edge.zip`: the same with the dictionary unpacked, for Edge Add-ons, which takes no packed files
             - `yaoki-reader-firefox.zip`: Firefox and Firefox for Android (addons.mozilla.org signs it)
             - `yaoki-reader-safari.zip`: Safari on iPhone, iPad and Mac, by way of Xcode or App Store Connect's Safari Web Extension Packager
 

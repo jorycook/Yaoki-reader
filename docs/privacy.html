@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yaoki Reader privacy statement</title>
+<meta name="description" content="Yaoki Reader, the browser extension, collects no data and sends none anywhere.">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<style>
+/* the same stationery as the reader (index.html), for one page of text */
+:root { --ground: #F4F5F9; --card: #FFFFFF; --ink: #1B2440; --muted: #5A6382; --line: #DDE1EC; --outline: #1B2440; --accent-ink: #2F4FD0; --note: #FFF4D6;
+  --ui: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Yu Gothic', system-ui, sans-serif; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --ground: #12172A; --card: #1C233B; --ink: #E8EBF6; --muted: #A6AECA; --line: #2C3554; --outline: #7B86B4; --accent-ink: #A9B8FF; --note: #37301A; color-scheme: dark; } }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--ui); font-size: 15px; line-height: 1.55; font-weight: 500; }
+main { max-width: 640px; margin: 0 auto; padding: 24px 16px 60px; }
+h1 { font-size: 24px; font-weight: 800; margin: 0 0 4px; }
+h1 small { display: block; font-size: 13px; font-weight: 700; color: var(--muted); }
+h2 { font-size: 16px; font-weight: 800; margin: 24px 0 6px; }
+p, li { margin: 0 0 10px; }
+ul { padding-left: 22px; }
+.card { padding: 14px 16px; border-radius: 18px; background: var(--card); border: 2px solid var(--outline); box-shadow: 0 3px 0 var(--outline); margin: 14px 0; font-weight: 700; }
+a { color: var(--accent-ink); text-underline-offset: 3px; }
+.foot { margin-top: 28px; font-size: 13px; color: var(--muted); font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Yaoki Reader privacy statement <small>The browser extension. Last updated 26 October 2026.</small></h1>
+  <div class="card">Yaoki Reader collects no data and sends none anywhere.</div>
+
+  <h2>What it does with what you read</h2>
+  <p>When you touch and hold a Japanese word on a web page, the extension reads the sentence around it from the page and works out the readings and meanings on your device, with a dictionary it carries inside its package. Nothing from the page, and nothing about which pages you visit or which words you look up, leaves your browser.</p>
+  <p>The extension makes no network requests of its own. Its dictionary files are bundled; it loads no fonts, scripts or data from the web.</p>
+
+  <h2>What it keeps</h2>
+  <ul>
+    <li><b>Settings:</b> whether it is on, the sites you have switched it off for, what a touch shows (furigana, meanings, grammar notes), whether to keep the list below, and how long a hold takes. Kept in your browser's extension storage, on your device only.</li>
+    <li><b>The words you look up,</b> when the "Keep a list of what I look up" switch is on (it is on at first): each word with its reading and meaning, the sentence it was in, and the title and address of the page, kept in your browser's extension storage on your device only, at most 1,500 words. You can see the list from the toolbar panel, delete any entry or all of them, and save it as a file for Anki. Nothing is kept in private windows. Uninstalling the extension deletes the list.</li>
+  </ul>
+  <p>It keeps no account and no identifier. It sets no cookies and uses no analytics.</p>
+
+  <h2>Permissions</h2>
+  <ul>
+    <li><b>Read and change all your data on all websites:</b> so that a touch on any page can find the word under your finger and show its reading. The extension changes nothing on the page; readings and the card are drawn in a layer of its own above it.</li>
+    <li><b>Storage:</b> for the settings and the list above.</li>
+    <li><b>Offscreen documents</b> (Chrome and Edge only): to keep the dictionary loaded in the background between lookups.</li>
+  </ul>
+
+  <h2>Data shared with third parties</h2>
+  <p>None.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this statement: open an issue at <a href="https://github.com/jorycook/Yaoki-reader">github.com/jorycook/Yaoki-reader</a>.</p>
+  <p class="foot">This statement applies to Yaoki Reader as published from that repository. <a href="./">The Yaoki Reader app</a> keeps the texts you add in your browser, on your device, and the same applies to it.</p>
+</main>
+</body>
+</html>

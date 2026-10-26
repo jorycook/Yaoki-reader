@@ -86,8 +86,7 @@ async function main() {
   await phone('http://blog.test/', '読み進めた', 1, 'phone-3-blog.png');
   await page.close();
 
-  /* a desktop page, the mouse held on a word: 1280x800 as the Chrome Web Store asks */
-  const desk = await ctx.browser().newContext ? null : null;
+  /* desktop pages, the mouse held on a word: 1280x800, which the Chrome Web Store and Edge Add-ons ask for */
   const ctx2 = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'yaoki-shots-d-')), {
     channel: 'chromium', headless: true, viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1,
     args: ['--disable-extensions-except=' + EXT, '--load-extension=' + EXT],
@@ -97,17 +96,33 @@ async function main() {
   const d = await ctx2.newPage();
   await d.goto('http://blog.test/');
   for (let i = 0; i < 100; i++) { const st = await sw2.evaluate(() => toHost({ type: 'yaoki:status' })); if (st.state === 'ready') break; await wait(200); }
-  await wait(400);
-  const q = await d.evaluate(() => {
-    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    let n;
-    while ((n = w.nextNode())) { const i = n.data.indexOf('旅行記'); if (i >= 0) { const r = document.createRange(); r.setStart(n, i + 1); r.setEnd(n, i + 2); const b = r.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; } }
-  });
-  await d.mouse.move(q.x, q.y);
-  await d.mouse.down();
-  await wait(900);
-  await d.screenshot({ path: path.join(OUT, 'desktop-1-blog.png') });
-  await d.mouse.up();
+  async function desktop(url, word, nth, name) {
+    await d.goto(url);
+    await wait(400);
+    const q = await d.evaluate(([word, nth]) => {
+      const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = w.nextNode())) { const i = n.data.indexOf(word); if (i >= 0) { const r = document.createRange(); r.setStart(n, i + nth); r.setEnd(n, i + nth + 1); const b = r.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; } }
+    }, [word, nth]);
+    await d.mouse.move(q.x, q.y);
+    await d.mouse.down();
+    await wait(900);
+    await d.screenshot({ path: path.join(OUT, name) });
+    await d.mouse.up();
+    await wait(200);
+  }
+  await desktop('http://blog.test/', '旅行記', 1, 'desktop-1-blog.png');
+  await desktop('http://news.test/', '常連客', 1, 'desktop-2-news.png');
+  await desktop('http://news.test/', '残念がる', 1, 'desktop-3-grammar.png');
+  await desktop('http://blog.test/', '読み進めた', 1, 'desktop-4-form.png');
+  /* the toolbar panel, and the list of words looked up, each at its own width on a 1280x800 ground */
+  const panel = await ctx2.newPage();
+  await panel.setViewportSize({ width: 400, height: 800 });
+  await panel.goto('chrome-extension://' + new URL(sw2.url()).host + '/popup.html');
+  await panel.waitForSelector('#state-text');
+  for (let i = 0; i < 20; i++) { if (/ready/.test(await panel.locator('#state-text').innerText())) break; await wait(200); }
+  await panel.screenshot({ path: path.join(OUT, 'panel-400x800.png') });
+  await panel.close();
   await ctx2.close();
   await ctx.close();
   console.log('screenshots written to', OUT);

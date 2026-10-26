@@ -5,6 +5,9 @@
 (function (root) {
 'use strict';
 var worker = null, state = 'idle', done = 0, total = 17, error = '', nextId = 1, failedAt = 0;
+/* whether this build's dictionary files are not packed (tools/extension.py sets it for the Edge build, whose
+   store takes no packed files inside a package) */
+var PLAIN = false;
 /* after a failed load, lookups are told so for a while rather than starting it again at once (and again, in a loop) */
 var RETRY = 10000;
 var waiting = new Map();
@@ -39,7 +42,7 @@ function start() {
   };
   worker.onerror = function (ev) { fail((ev && ev.message) || 'the engine stopped'); };
   /* the extension's build has the dictionary packed for it (tools/extension.py) */
-  worker.postMessage({ type: 'init', packed: true });
+  worker.postMessage({ type: 'init', packed: true, plain: PLAIN });
 }
 /* a failed load is tried again at the next lookup */
 function fail(message) {
