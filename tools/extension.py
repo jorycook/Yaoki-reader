@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Builds the browser extension (extension/) with the reader's engine (docs/engine/) into dist/.
 
-usage: python3 tools/extension.py
+usage: python3 tools/extension.py            builds the packages
+       python3 tools/extension.py --source   the source archive addons.mozilla.org asks for (dist/yaoki-reader-src.tar.gz)
 
 The extension's own files are in extension/; the engine and its dictionary are the reader's, copied in at build
 time so there is one copy of them in the repository. Each browser gets a folder and a zip:
@@ -29,6 +30,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -36,7 +38,13 @@ TOP = os.path.join(HERE, '..')
 SRC = os.path.join(TOP, 'extension')
 ENGINE = os.path.join(TOP, 'docs', 'engine')
 DIST = os.path.join(TOP, 'dist')
+# fixed for life once addons.mozilla.org has signed a build with it: never change it
 GECKO_ID = 'yaoki-reader@jorycook.github.io'
+# addons.mozilla.org's limits: a package of 200 MB at most, 250 MiB unpacked, 100 MiB for any one file, and its
+# validator reads no .js, .json or .html file of 4 MiB or more (keep data out of those)
+AMO_TEXT_FILE = 4 * 1024 * 1024
+# never in a package: editors' backups and hidden files, which the validator flags, and shell scripts
+UNWANTED = re.compile(r'^(\.|__MACOSX|thumbs\.db$|.*\.(orig|old|sh)$|.*~$)', re.I)
 
 # the engine's files: worker.js loads the scripts beside it, and they load the dictionary from beside them
 ENGINE_FILES = ['worker.js', 'kuromoji.js', 'analyzer.js', 'boot.js', 'jm-1.txt', 'jm-2.txt', 'jm-3.txt', 'kanji.txt']
@@ -70,7 +78,10 @@ def firefox(m):
 def safari(m):
     m = dict(m)
     m['background'] = {'scripts': ['host.js', 'background.js'], 'persistent': False}
-    m['permissions'] = [p for p in m['permissions'] if p != 'offscreen']
+    # Safari caps the extension's storage at 5 MB without unlimitedStorage (the list of looked-up words is kept there)
+    m['permissions'] = [p for p in m['permissions'] if p != 'offscreen'] + ['unlimitedStorage']
+    # Apple's packager takes the largest icon declared as the app's icon: opaque, square-cornered (iOS rounds it)
+    m['icons'] = dict(m['icons'], **{'512': 'icons/app-512.png', '1024': 'icons/app-1024.png'})
     m.pop('minimum_chrome_version', None)
     return m
 
@@ -231,9 +242,13 @@ def pack(folder, zip_path):
         os.remove(zip_path)
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for base, dirs, files in os.walk(folder):
-            dirs.sort()
+            dirs[:] = sorted(d for d in dirs if not UNWANTED.match(d))
             for f in sorted(files):
+                if UNWANTED.match(f):
+                    continue
                 full = os.path.join(base, f)
+                if re.search(r'\.(js|json|html)$', f) and os.path.getsize(full) >= AMO_TEXT_FILE:
+                    raise SystemExit('%s is %d bytes: addons.mozilla.org reads no script or page of 4 MiB or more' % (full, os.path.getsize(full)))
                 info = zipfile.ZipInfo(os.path.relpath(full, folder), date_time=(2026, 1, 1, 0, 0, 0))
                 info.compress_type = zipfile.ZIP_DEFLATED
                 info.external_attr = 0o644 << 16
@@ -241,7 +256,24 @@ def pack(folder, zip_path):
                     z.writestr(info, fh.read(), compresslevel=9)
 
 
+def source_archive():
+    """The source as addons.mozilla.org asks for it with a package that holds a bundled library (kuromoji.js):
+    dist/yaoki-reader-src.tar.gz, the committed tree with store/BUILD-FIREFOX.md, which says how the package is
+    built from it, plus the versions of the tools this build used."""
+    out = os.path.join(DIST, 'yaoki-reader-src.tar.gz')
+    versions = os.path.join(DIST, 'TOOL-VERSIONS.txt')
+    node = subprocess.run(['node', '--version'], capture_output=True, text=True).stdout.strip() if shutil.which('node') else 'none'
+    with open(versions, 'w') as f:
+        f.write('Built with Python %s and Node %s on %s.\n' % (sys.version.split()[0], node, sys.platform))
+    subprocess.run(['git', '-C', TOP, 'archive', '--format=tar.gz', '--prefix=yaoki-reader/', '--add-file=' + versions, '-o', out, 'HEAD'], check=True)
+    print('dist/%s (%.1f MB): the source, for addons.mozilla.org' % (os.path.basename(out), os.path.getsize(out) / 1e6))
+
+
 def main():
+    if '--source' in sys.argv:
+        os.makedirs(DIST, exist_ok=True)
+        source_archive()
+        return
     os.makedirs(DIST, exist_ok=True)
     index, dict_dir = make_index(), packed_dict()
     for name, shape, offscreen, bom, plain in TARGETS:

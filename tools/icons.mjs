@@ -58,6 +58,11 @@ for (const [name, size] of [['icon-64.png', 64], ['icon-128.png', 128], ['icon-3
   fs.writeFileSync(path.join(STORE, name), await sharp(Buffer.from(rounded(1024, 768, 0.78))).resize(size, size).png({ compressionLevel: 9 }).toBuffer());
 }
 fs.writeFileSync(path.join(STORE, 'app-icon-1024.png'), await sharp(Buffer.from(icon(1024, 0.7))).flatten({ background: GROUND }).removeAlpha().png({ compressionLevel: 9 }).toBuffer());
+/* the Safari build's manifest declares these two as well: Apple's packager takes the largest icon declared as the
+   app's icon, which must be opaque and square-cornered (iOS rounds it) */
+for (const size of [512, 1024]) {
+  fs.writeFileSync(path.join(EXT, `app-${size}.png`), await sharp(Buffer.from(icon(1024, 0.7))).resize(size, size).flatten({ background: GROUND }).removeAlpha().png({ compressionLevel: 9 }).toBuffer());
+}
 /* the Chrome Web Store shows the 128 px icon from the package in its listing: the same rounded one there */
 fs.copyFileSync(path.join(STORE, 'icon-128.png'), path.join(EXT, 'icon-128.png'));
 const PROMO = path.join(HERE, '..', 'store', 'promo');

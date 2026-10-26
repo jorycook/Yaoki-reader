@@ -104,7 +104,22 @@ def main():
 
 
 def run(drv, site):
+    mine = drv.current_window_handle
     drv.install_addon(EXT, temporary=True)
+    # installed, the extension opens its welcome page in a tab of its own, which comes to the front: the test's own
+    # tab must be in front again, or the browser gives it no animation frames and the card does not follow
+    step('installed, it opens its welcome page once')
+    end = time.time() + 5
+    while time.time() < end and len(drv.window_handles) < 2:
+        time.sleep(0.2)
+    others = [h for h in drv.window_handles if h != mine]
+    welcome = False
+    for h in others:
+        drv.switch_to.window(h)
+        welcome = welcome or drv.current_url.endswith('/welcome.html')
+        drv.close()
+    drv.switch_to.window(mine)
+    ok(welcome, 'a page with the gesture and lines to try it on opened on install')
     drv.set_window_size(800, 900)
 
     def at(sel, ch):

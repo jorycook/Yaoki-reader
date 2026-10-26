@@ -50,7 +50,8 @@ async function main() {
   fs.mkdirSync(OUT, { recursive: true });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yaoki-shots-'));
   const ctx = await chromium.launchPersistentContext(dir, {
-    channel: 'chromium', headless: true, hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 }, deviceScaleFactor: 3,
+    /* 393x852 at 3x is 1179x2556, the iPhone size the App Store asks for; the same shots serve the other stores */
+    channel: 'chromium', headless: true, hasTouch: true, isMobile: true, viewport: { width: 393, height: 852 }, deviceScaleFactor: 3,
     args: ['--disable-extensions-except=' + EXT, '--load-extension=' + EXT],
   });
   await ctx.route(/^http:\/\/(news|blog)\.test\//, (r) => r.fulfill({ status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, body: PAGES[new URL(r.request().url()).host + '/'] }));
@@ -84,7 +85,30 @@ async function main() {
   await phone('http://news.test/', '常連客', 1, 'phone-1-news.png');
   await phone('http://news.test/', '残念がる', 1, 'phone-2-grammar.png');
   await phone('http://blog.test/', '読み進めた', 1, 'phone-3-blog.png');
-  await page.close();
+  /* the iPad size the App Store asks for: 1032x1376 at 2x is 2064x2752 */
+  await page.setViewportSize({ width: 1032, height: 1376 });
+  await ctx.close();
+  const pad = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'yaoki-shots-p-')), {
+    channel: 'chromium', headless: true, hasTouch: true, isMobile: true, viewport: { width: 1032, height: 1376 }, deviceScaleFactor: 2,
+    args: ['--disable-extensions-except=' + EXT, '--load-extension=' + EXT],
+  });
+  await pad.route(/^http:\/\/(news|blog)\.test\//, (r) => r.fulfill({ status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, body: PAGES[new URL(r.request().url()).host + '/'] }));
+  const swp = pad.serviceWorkers()[0] || await pad.waitForEvent('serviceworker', { timeout: 15000 });
+  const pp = await pad.newPage();
+  await pp.goto('http://news.test/');
+  for (let i = 0; i < 100; i++) { const st = await swp.evaluate(() => toHost({ type: 'yaoki:status' })); if (st.state === 'ready') break; await wait(200); }
+  await wait(400);
+  const cdpp = await pad.newCDPSession(pp);
+  const pq = await pp.evaluate(() => {
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = w.nextNode())) { const i = n.data.indexOf('常連客'); if (i >= 0) { const r = document.createRange(); r.setStart(n, i + 1); r.setEnd(n, i + 2); const b = r.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; } }
+  });
+  await cdpp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pq] });
+  await wait(900);
+  await pp.screenshot({ path: path.join(OUT, 'ipad-1-news.png') });
+  await cdpp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await pad.close();
 
   /* desktop pages, the mouse held on a word: 1280x800, which the Chrome Web Store and Edge Add-ons ask for */
   const ctx2 = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'yaoki-shots-d-')), {
@@ -115,6 +139,31 @@ async function main() {
   await desktop('http://news.test/', '常連客', 1, 'desktop-2-news.png');
   await desktop('http://news.test/', '残念がる', 1, 'desktop-3-grammar.png');
   await desktop('http://blog.test/', '読み進めた', 1, 'desktop-4-form.png');
+  /* addons.mozilla.org may insist on 4:3: the same two scenes at 800x600, twice the density (1600x1200) */
+  const four = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'yaoki-shots-f-')), {
+    channel: 'chromium', headless: true, viewport: { width: 800, height: 600 }, deviceScaleFactor: 2,
+    args: ['--disable-extensions-except=' + EXT, '--load-extension=' + EXT],
+  });
+  await four.route(/^http:\/\/(news|blog)\.test\//, (r) => r.fulfill({ status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, body: PAGES[new URL(r.request().url()).host + '/'] }));
+  const swf = four.serviceWorkers()[0] || await four.waitForEvent('serviceworker', { timeout: 15000 });
+  const f = await four.newPage();
+  await f.goto('http://blog.test/');
+  for (let i = 0; i < 100; i++) { const st = await swf.evaluate(() => toHost({ type: 'yaoki:status' })); if (st.state === 'ready') break; await wait(200); }
+  for (const [url, word, name] of [['http://blog.test/', '旅行記', 'firefox-1-blog.png'], ['http://news.test/', '常連客', 'firefox-2-news.png']]) {
+    await f.goto(url);
+    await wait(400);
+    const q = await f.evaluate((word) => {
+      const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = w.nextNode())) { const i = n.data.indexOf(word); if (i >= 0) { const r = document.createRange(); r.setStart(n, i + 1); r.setEnd(n, i + 2); const b = r.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; } }
+    }, word);
+    await f.mouse.move(q.x, q.y);
+    await f.mouse.down();
+    await wait(900);
+    await f.screenshot({ path: path.join(OUT, name) });
+    await f.mouse.up();
+  }
+  await four.close();
   /* the toolbar panel, and the list of words looked up, each at its own width on a 1280x800 ground */
   const panel = await ctx2.newPage();
   await panel.setViewportSize({ width: 400, height: 800 });
@@ -124,7 +173,6 @@ async function main() {
   await panel.screenshot({ path: path.join(OUT, 'panel-400x800.png') });
   await panel.close();
   await ctx2.close();
-  await ctx.close();
   console.log('screenshots written to', OUT);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
