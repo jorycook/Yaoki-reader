@@ -44,6 +44,12 @@ The engine and dictionary are the reader's (`docs/engine/`), copied in by the bu
 
 The three builds differ only where the browsers do. Chrome's background is a service worker, which cannot hold the engine, so the engine runs in an offscreen document (`host.html`), which Chrome keeps open. Firefox closes a Manifest V3 background page after 30 seconds idle, so its build is Manifest V2 with a background page that stays loaded. iPhone allows only a background page that Safari closes when idle, so in the Safari build pages with Japanese on them wake it every 20 seconds for a quarter of an hour after a lookup; Safari before 18.4 also needs the scripts marked as UTF-8, which the build does.
 
+### Publishing it
+
+`store/` holds what the stores ask for: `PRIVACY.md` (the privacy statement: nothing is collected), `LISTING.md` (the listing text, permission justifications, notes to the reviewer), `icons/` (listing icons and the App Store's opaque 1024 px app icon, drawn by `tools/icons.mjs`) and `screenshots/` (taken by `tools/screenshots.js` on sample pages of its own). `tools/kuromoji/reader.patch` is the exact change to kuromoji.js against the published library, for Mozilla's reviewers, who check modified libraries; `tools/kuromoji/patch.sh check` confirms it. The zips are reproducible: a build of the same commit gives the same bytes.
+
+Pushing a tag `v1.0.0` (matching `version` in `extension/manifest.json`) makes a GitHub release with the three zips and their checksums (`.github/workflows/release.yml`); every push runs the tests (`check.yml`). Submitting to the stores is done by hand: upload the zip, paste the text from `LISTING.md`, link `PRIVACY.md`.
+
 **Limits.** On iPhone, Safari decides when a finger lands whether a long press will select text, so the touched text is made unselectable at once; if Safari still shows its magnifier on some page, that is Safari's own long press, which a page cannot always stop. Text in images, canvases and form fields is not read. A page inside a frame gets its own card, inside the frame.
 
 ## What is where

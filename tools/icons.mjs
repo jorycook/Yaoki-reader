@@ -43,3 +43,13 @@ for (const [size, share] of [[16, 0.86], [32, 0.82], [48, 0.78], [128, 0.72]]) {
   fs.writeFileSync(path.join(EXT, `icon-${size}.png`), await sharp(Buffer.from(icon(1024, share))).resize(size, size).png({ compressionLevel: 9 }).toBuffer());
 }
 console.log('extension icons written to', EXT);
+/* the stores' (store/icons/): the listings' icons, and the App Store's app icon, which must be opaque (no alpha)
+   and 1024 px, in sRGB */
+const STORE = path.join(HERE, '..', 'store', 'icons');
+fs.mkdirSync(STORE, { recursive: true });
+for (const [name, size, share, alpha] of [['icon-64.png', 64, 0.76, true], ['icon-128.png', 128, 0.72, true], ['icon-300.png', 300, 0.7, true], ['icon-512.png', 512, 0.7, true], ['app-icon-1024.png', 1024, 0.7, false]]) {
+  let img = sharp(Buffer.from(icon(1024, share))).resize(size, size);
+  if (!alpha) img = img.flatten({ background: GROUND }).removeAlpha();
+  fs.writeFileSync(path.join(STORE, name), await img.png({ compressionLevel: 9 }).toBuffer());
+}
+console.log('store icons written to', STORE);

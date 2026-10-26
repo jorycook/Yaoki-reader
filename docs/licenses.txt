@@ -20,10 +20,14 @@ conformance with the Group's licence (Creative Commons Attribution-ShareAlike
 
 == kuromoji.js 0.1.2 (word splitting and readings) ==
 Copyright Takuya Asano. Apache License 2.0 (full text at the end of this file).
-engine/kuromoji.js is the library's browser build, changed in one place: its
-dictionary loader reads the dictionary files as base64 text (engine/dict/*.b64.txt)
-instead of binary files. The build also bundles these libraries, all MIT licensed:
-async, doublearray, zlibjs.
+engine/kuromoji.js is the library's browser build (build/kuromoji.js of the
+kuromoji 0.1.2 package on npm), changed in three places, each marked "Reader
+patch": its dictionary loader reads the dictionary files as base64 text
+(engine/dict/*.b64.txt; the browser extension's build has them as gzip binary) and
+unpacks them with the browser's own DecompressionStream where there is one, and
+its target map is kept as the file's own numbers rather than an object of arrays.
+The exact changes are tools/kuromoji/reader.patch in the source repository. The
+build also bundles these libraries, all MIT licensed: async, doublearray, zlibjs.
 
 -- kuromoji.js NOTICE --
 Library dependencies

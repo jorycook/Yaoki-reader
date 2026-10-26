@@ -1,0 +1,45 @@
+# On a version tag (v1.0.0): builds the extension's three packages and attaches them to a GitHub release of that
+# tag, with their checksums. The tag must match the version in extension/manifest.json.
+# To release: bump "version" in extension/manifest.json, commit, then
+#   git tag v1.0.0 && git push origin v1.0.0
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: The tag matches the manifest's version
+        run: |
+          version=$(python3 -c "import json; print(json.load(open('extension/manifest.json'))['version'])")
+          test "v$version" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} but manifest version $version"; exit 1; }
+      - name: Build
+        run: python3 tools/extension.py
+      - name: Checksums
+        run: cd dist && sha256sum yaoki-reader-*.zip | tee SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/yaoki-reader-chrome.zip
+            dist/yaoki-reader-firefox.zip
+            dist/yaoki-reader-safari.zip
+            dist/SHA256SUMS
+          body: |
+            Yaoki Reader ${{ github.ref_name }}: the browser extension, built from this tag by `python3 tools/extension.py`.
+
+            - `yaoki-reader-chrome.zip`: Chrome, Edge and other Chromium browsers (and the Chrome Web Store, Edge Add-ons)
+            - `yaoki-reader-firefox.zip`: Firefox and Firefox for Android (addons.mozilla.org signs it)
+            - `yaoki-reader-safari.zip`: Safari on iPhone, iPad and Mac, by way of Xcode or App Store Connect's Safari Web Extension Packager
+
+            How to install each: see the README's "On any web page: the browser extension". The zips are reproducible: a build of the same tag gives the same bytes (`SHA256SUMS`).

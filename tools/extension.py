@@ -196,6 +196,8 @@ def build(name, shape, offscreen, bom, index, dict_dir):
 
 
 def pack(folder, zip_path):
+    """The zip, the same bytes from the same files whoever makes it and whenever (one date for every entry, files in
+    one order), so that a build can be compared with a release's."""
     if os.path.exists(zip_path):
         os.remove(zip_path)
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
@@ -203,7 +205,11 @@ def pack(folder, zip_path):
             dirs.sort()
             for f in sorted(files):
                 full = os.path.join(base, f)
-                z.write(full, os.path.relpath(full, folder))
+                info = zipfile.ZipInfo(os.path.relpath(full, folder), date_time=(2026, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o644 << 16
+                with open(full, 'rb') as fh:
+                    z.writestr(info, fh.read(), compresslevel=9)
 
 
 def main():
