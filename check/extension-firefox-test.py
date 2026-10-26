@@ -253,6 +253,15 @@ def run(drv, site):
         time.sleep(0.3)
     ok('ready' in text, 'the panel says the dictionary is ready: ' + text)
 
+    step('the list of words looked up')
+    drv.get('moz-extension://%s/list.html' % uuid)
+    end = time.time() + 10
+    text = ''
+    while time.time() < end and '天気' not in text:
+        text = drv.find_element('id', 'list').text
+        time.sleep(0.3)
+    ok('いい天気' in text and 'fine weather' in text and '今日はいい天気ですね' in text, 'the list page shows いい天気, held earlier, with its sentence: ' + text.replace('\n', ' ')[:80])
+
 
 if __name__ == '__main__':
     main()

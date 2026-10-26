@@ -60,6 +60,14 @@ h2 [lang="ja"] { color: var(--ink); }
 .state.problem { background: none; border: 2px solid var(--stamp); }
 .notebox { padding: 10px 12px; border-radius: 16px; background: var(--note); font-size: 12px; line-height: 1.5; }
 .notebox b { font-weight: 800; }
+.looked { padding: 10px 12px; border-radius: 16px; background: var(--card); border: 2px solid var(--line-strong); display: flex; flex-direction: column; gap: 8px; }
+.looked ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.looked li { display: flex; align-items: baseline; gap: 5px; }
+.looked .w { font-family: var(--jp); font-size: 17px; font-weight: 600; }
+.looked .r { font-size: 11px; font-weight: 700; color: var(--muted); }
+.looked .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.looked .n { font-size: 13px; font-weight: 700; color: var(--muted); }
+.mini { min-height: 36px; padding: 0 12px; border-radius: 12px; border: 2px solid var(--outline); background: var(--card); font-size: 13px; font-weight: 800; }
 .foot { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .foot a { display: inline-flex; align-items: center; min-height: 36px; color: var(--accent-ink); font-size: 13px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
 [hidden] { display: none !important; }
@@ -86,6 +94,13 @@ h2 [lang="ja"] { color: var(--ink); }
   <button class="switch" type="button" role="switch" id="sw-furigana" aria-checked="true" aria-labelledby="sw-furigana-nm" aria-describedby="sw-furigana-ds"><span class="txt"><span class="nm" id="sw-furigana-nm"><span lang="ja">ふりがな</span> <small>Furigana</small></span><span class="ds" id="sw-furigana-ds">Readings above the kanji, in the page and in the card.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
   <button class="switch" type="button" role="switch" id="sw-meanings" aria-checked="true" aria-labelledby="sw-meanings-nm" aria-describedby="sw-meanings-ds"><span class="txt"><span class="nm" id="sw-meanings-nm"><span lang="ja">語の意味</span> <small>Word meanings</small></span><span class="ds" id="sw-meanings-ds">English under each word. Particles are left untranslated.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
   <button class="switch" type="button" role="switch" id="sw-grammar" aria-checked="true" aria-labelledby="sw-grammar-nm" aria-describedby="sw-grammar-ds"><span class="txt"><span class="nm" id="sw-grammar-nm"><span lang="ja">文法メモ</span> <small>Grammar note</small></span><span class="ds" id="sw-grammar-ds">The pattern inside the phrase, such as 〜ながら.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
+
+  <h2><span lang="ja">のぞいた語句</span> · Looked up</h2>
+  <div class="looked">
+    <ul id="looked-recent"></ul>
+    <div class="row"><span id="looked-n" class="n">Nothing yet.</span><button class="mini" type="button" id="open-list" hidden>Open the list</button></div>
+  </div>
+  <button class="switch" type="button" role="switch" id="sw-keep" aria-checked="true" aria-labelledby="sw-keep-nm" aria-describedby="sw-keep-ds"><span class="txt"><span class="nm" id="sw-keep-nm"><span lang="ja">記録</span> <small>Keep a list of what I look up</small></span><span class="ds" id="sw-keep-ds">Each word with its sentence, on this device only; nothing in private windows. The list can be saved for Anki.</span></span><span class="knob" aria-hidden="true"><i></i></span></button>
 
   <h2 id="hold-h"><span lang="ja">長押しの長さ</span> · How long to hold</h2>
   <div class="seg" role="group" aria-labelledby="hold-h">

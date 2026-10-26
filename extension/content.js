@@ -11,7 +11,7 @@ if (window.__yaokiReader) return;
 window.__yaokiReader = true;
 
 /* ---------- settings (kept by popup.js in storage.local) ---------- */
-var DEFAULTS = { on: true, off: [], furigana: true, meanings: true, grammar: true, hold: 1 };
+var DEFAULTS = { on: true, off: [], furigana: true, meanings: true, grammar: true, hold: 1, keep: true };
 /* how long a finger or the mouse button stays still on a word before it counts as holding it, in ms */
 var HOLDS = [120, 220, 400];
 var S = Object.assign({}, DEFAULTS);
@@ -850,6 +850,54 @@ function redraw() {
   var m = markPhrase(shown.spot, shown.ph);
   fillCard(shown.ph.c);
   placeCard(m.box, shown.touchy);
+  noteLater();
+}
+/* ---------- the list of what was looked up (のぞいた語句, as in the reader) ---------- */
+/* A phrase goes on the list when its card has been in view for a second, or when the finger (or the button, or
+   Shift) is let go on it, so that sliding along a line lists only the words the finger rested on. Each word once
+   per page. Nothing in a private window, and nothing when the switch is off. The list itself is kept by
+   background.js in the browser's extension storage, on this device. */
+var noted = {}, noteTimer = 0;
+function noteLater() {
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(noteShown, 1000);
+}
+function noteShown() {
+  clearTimeout(noteTimer);
+  if (!shown || !shown.ph || !S.keep || dead) return;
+  if (api.extension && api.extension.inIncognitoContext) return;
+  var c = shown.ph.c, d = c.d;
+  if (!d || !d[0]) return;
+  var key = d[0] + '\t' + (d[1] || '');
+  if (noted[key]) return;
+  noted[key] = 1;
+  var spot = shown.spot, ph = shown.ph;
+  var cut = sentenceOf(spot.text, ph.from, ph.to);
+  send({
+    type: 'yaoki:keep', w: d[0], r: d[1] || '', e: d[2] || '',
+    x: c.w.map(function (w) { return w.s.map(function (x) { return x[0]; }).join(''); }).join(''),
+    s: cut.text, a: cut.from, b: cut.to,
+    t: (document.title || '').slice(0, 80), u: location.origin + location.pathname,
+  });
+}
+/* the sentence the phrase is in, cut from the text sent to the engine, and where the phrase is in it */
+function sentenceOf(text, from, to) {
+  var start = 0, end = text.length, m;
+  END.lastIndex = 0;
+  while ((m = END.exec(text))) {
+    var e = m.index + m[0].length;
+    if (e <= from) start = e; else if (m.index >= to) { end = e; break; }
+  }
+  var lead = text.slice(start, from).replace(/^[\s\u3000]+/, '');
+  start = from - lead.length;
+  end = start + text.slice(start, end).replace(/[\s\u3000]+$/, '').length;
+  /* a very long sentence: a stretch around the phrase */
+  if (end - start > 140) {
+    var extra = Math.max(0, 140 - (to - from)), before = Math.min(from - start, Math.floor(extra / 2));
+    start = from - before;
+    end = Math.min(end, to + (extra - before));
+  }
+  return { text: text.slice(start, end), from: from - start, to: Math.min(to, end) - start };
 }
 function hideCard() {
   if (!host || !layer.card) return;
@@ -860,6 +908,7 @@ function hideCard() {
 function release() {
   asked++;
   clearTimeout(retry);
+  noteShown();
   shown = null;
   hideCard();
 }

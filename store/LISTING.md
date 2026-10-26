@@ -16,7 +16,7 @@ Read Japanese on the web the way you would with a teacher beside you: touch a wo
 
 With a mouse, hold the button down on a word, or hold Shift and point.
 
-What a touch shows is up to you: furigana, word meanings, the grammar note, each with its own switch; the dictionary form of an inflected word (行く for 行きません) comes with the meaning. A page's own furigana decide readings where the page has them. Chinese pages are left alone.
+What a touch shows is up to you: furigana, word meanings, the grammar note, each with its own switch; the dictionary form of an inflected word (行く for 行きません) comes with the meaning. The words you look up go on a list (のぞいた語句, as in the app) with the sentence each was in, to look over later or save for Anki; a switch turns the list off, and it never leaves your device. A page's own furigana decide readings where the page has them. Chinese pages are left alone.
 
 Everything is worked out on your device, from a dictionary carried inside the extension (JMdict for words, KANJIDIC2 for kanji, kuromoji.js for splitting sentences into words). Nothing you read is sent anywhere, and the extension makes no network requests at all. Switch it off for a site, or everywhere, from its toolbar panel.
 
@@ -60,7 +60,7 @@ No other code is minified, transpiled or bundled: the extension's own files (con
 
 To build the package from source: `python3 tools/extension.py` in the repository (Python 3 and Node), which writes dist/yaoki-reader-firefox.zip. The dictionary files are made from docs/engine/dict/*.b64.txt (the same data as base64 text) and the index by tools/jm-index.js from the word list; check/dict-test.js shows both give the same tokens and analyses as the reader's own files.
 
-The extension makes no network requests. The content script runs on all sites because the user may read Japanese anywhere; it does nothing until a touch, hold or Shift+point on Japanese text.
+The list of looked-up words (storage.local key 'looked') is written only by background.js from the content script's 'yaoki:keep' messages and read by popup.js and list.html; it is never synced or sent. The extension makes no network requests. The content script runs on all sites because the user may read Japanese anywhere; it does nothing until a touch, hold or Shift+point on Japanese text.
 
 The Firefox build is Manifest V2 with a persistent background page because the engine takes seconds to load and holds about 200 MB; an event page would be closed after 30 s idle and reloaded at every lookup. data_collection_permissions: none.
 

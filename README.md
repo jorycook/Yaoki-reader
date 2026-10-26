@@ -25,7 +25,9 @@ Aozora Bunko's own site does not let other web pages fetch its files, so the rea
 
 It is the reader's own engine, run once in the background for all tabs, so readings and meanings are the reader's, worked out on the device; nothing a page says is sent anywhere. The dictionary loads (in about a second on a computer, a few on a phone) when a page with Japanese on it opens, when such a tab comes back on screen, or when a finger lands on Japanese with the dictionary not loaded; it is let go after half an hour unused, and Safari lets it go sooner, to save memory. A page's own furigana (`<ruby>`) decide readings, as Aozora's do in the reader. Kanji with no kana near them on a page not marked Japanese are taken for Chinese and left alone.
 
-The toolbar button opens a panel: switch it off everywhere or for one site, choose what a touch shows (furigana, word meanings, grammar note: the reader's three switches) and how long a hold takes (short, normal, long).
+The words you look up go on a list, **のぞいた語句**, as in the reader: each word (in its dictionary form, with its reading and meaning) with the sentence it was in and the page it was on, once per page, when its card has been in view for a second or the finger is let go on it, so that sliding along a line lists only the words the finger rested on. The list is kept in the browser's extension storage on the device, newest first, at most 1,500 words, with nothing from private windows; the toolbar panel shows the newest few and opens the whole list (`list.html`), where entries can be found, deleted, copied as sentences (to paste into the reader as a text) or saved as a tab-separated file that Anki's Import takes as it is.
+
+The toolbar button opens a panel: switch it off everywhere or for one site, choose what a touch shows (furigana, word meanings, grammar note: the reader's three switches), whether to keep the list, and how long a hold takes (short, normal, long).
 
 ### Building and installing it
 
@@ -73,6 +75,7 @@ The site is `docs/`, served by GitHub Pages (Settings → Pages → Deploy from 
 | `extension/content.js`, `content.css` | The extension on each page: the touch, mouse and Shift gestures; the character under the finger and the sentence around it (with the page's own ruby); the phrase it is in, from the engine; the readings over the kanji, the mark and the card, drawn in a layer of their own (a closed shadow root) so the page is not changed. |
 | `extension/background.js`, `host.js`, `host.html`, `host-offscreen.js` | Pass lookups to the one engine for all tabs (`docs/engine/worker.js`) and keep it running: in Chrome's offscreen document (`host.html`), or in the background page in Firefox and Safari. |
 | `extension/popup.html`, `popup.js`, `manifest.json`, `icons/` | The toolbar panel (settings kept in the browser's extension storage), the manifest the three builds are made from, and the icons (drawn by `tools/icons.mjs`). |
+| `extension/list.html`, `list.js` | The list of words looked up (`looked` in the extension storage, written by `background.js`): find, delete, copy the sentences, save for Anki. |
 | `tools/` | `aozora-catalog.py` (remakes the catalog), `jm-supplement.py`, `kanji-meanings.py`, `jisx0213-table.py`, `icons.mjs`, `extension.py` (builds the extension into `dist/`), `jm-index.js` (the extension's word index made ahead of time). |
 | `check/` | The tests (Playwright; Selenium for the extension in Firefox). |
 

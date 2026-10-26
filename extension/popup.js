@@ -3,14 +3,14 @@
 (function () {
 'use strict';
 var api = typeof browser !== 'undefined' && browser.runtime ? browser : chrome;
-var DEFAULTS = { on: true, off: [], furigana: true, meanings: true, grammar: true, hold: 1 };
+var DEFAULTS = { on: true, off: [], furigana: true, meanings: true, grammar: true, hold: 1, keep: true };
 var S = Object.assign({}, DEFAULTS), site = '';
 function $(id) { return document.getElementById(id); }
 
 function save() { return api.storage.local.set({ settings: S }); }
 function render() {
   $('sw-on').setAttribute('aria-checked', String(S.on));
-  ['furigana', 'meanings', 'grammar'].forEach(function (k) { $('sw-' + k).setAttribute('aria-checked', String(S[k])); });
+  ['furigana', 'meanings', 'grammar', 'keep'].forEach(function (k) { $('sw-' + k).setAttribute('aria-checked', String(S[k])); });
   [0, 1, 2].forEach(function (i) { $('hold-' + i).setAttribute('aria-pressed', String(S.hold === i)); });
   var b = $('sw-site');
   if (site) {
@@ -26,8 +26,30 @@ api.storage.local.get('settings').then(function (v) {
 });
 
 $('sw-on').addEventListener('click', function () { S.on = !S.on; render(); save(); });
-['furigana', 'meanings', 'grammar'].forEach(function (k) {
+['furigana', 'meanings', 'grammar', 'keep'].forEach(function (k) {
   $('sw-' + k).addEventListener('click', function () { S[k] = !S[k]; render(); save(); });
+});
+
+/* the list of words looked up: how many, the newest few, and the page that shows them all */
+function showLooked(head) {
+  var n = head && head.n || 0, recent = (head && head.recent) || [];
+  $('looked-n').textContent = n ? n + (n === 1 ? ' word' : ' words') : 'Nothing yet.';
+  var box = $('looked-recent');
+  box.textContent = '';
+  recent.forEach(function (e) {
+    var li = document.createElement('li');
+    var w = document.createElement('span'); w.className = 'w'; w.lang = 'ja'; w.textContent = e.w;
+    li.appendChild(w);
+    if (e.r) { var r = document.createElement('span'); r.className = 'r'; r.lang = 'ja'; r.textContent = e.r; li.appendChild(r); }
+    box.appendChild(li);
+  });
+  $('open-list').hidden = !n;
+}
+api.storage.local.get('lookedHead').then(function (v) { showLooked(v && v.lookedHead); });
+api.storage.onChanged.addListener(function (ch, area) { if (area === 'local' && ch.lookedHead) showLooked(ch.lookedHead.newValue); });
+$('open-list').addEventListener('click', function () {
+  api.tabs.create({ url: api.runtime.getURL('list.html') });
+  window.close();
 });
 [0, 1, 2].forEach(function (i) { $('hold-' + i).addEventListener('click', function () { S.hold = i; render(); save(); }); });
 $('sw-site').addEventListener('click', function () {

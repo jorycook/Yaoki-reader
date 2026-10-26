@@ -50,6 +50,10 @@ var closesWhenIdle = !!self.YaokiHost && !(manifest.manifest_version === 2 && ma
 api.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (!msg || msg.to || typeof msg.type !== 'string' || msg.type.indexOf('yaoki:') !== 0) return false;
   if (sender && sender.id && sender.id !== api.runtime.id) return false;
+  if (msg.type === 'yaoki:keep') {
+    keepWord(msg).then(sendResponse, function (err) { sendResponse({ error: String((err && err.message) || err) }); });
+    return true;
+  }
   /* a ping that finds the page reopened (Safari closed it anyway, short of memory) starts loading the engine again */
   if (msg.type === 'yaoki:ping') msg = { type: 'yaoki:warm' };
   /* the panel asking how far the engine has got does not open Chrome's offscreen document by itself */
@@ -65,6 +69,39 @@ api.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   }, function (err) { sendResponse({ error: String((err && err.message) || err) }); });
   return true;
 });
+
+/* The list of words looked up (のぞいた語句): kept in the browser's extension storage on this device as 'looked',
+   newest first, one entry per word and reading (a word met again moves to the top, with its newest sentence and a
+   count), at most LOOKED entries; 'lookedHead' (how many, the newest few) is what the panel reads. Writes from all
+   tabs go one after another. Never storage.sync, which would send the list to the browser's maker. */
+var LOOKED = 1500, keeping = Promise.resolve();
+function text(v, n) { return typeof v === 'string' ? v.slice(0, n) : ''; }
+function keepWord(m) {
+  var w = text(m.w, 60), r = text(m.r, 60);
+  if (!w) return Promise.resolve({ error: 'no word' });
+  var done = keeping.then(function () {
+    return api.storage.local.get('looked').then(function (v) {
+      var list = Array.isArray(v && v.looked) ? v.looked : [], now = Date.now();
+      var at = -1;
+      for (var i = 0; i < list.length; i++) if (list[i] && list[i].w === w && list[i].r === r) { at = i; break; }
+      var entry = at >= 0 ? list.splice(at, 1)[0] : { w: w, r: r, n: 0, first: now };
+      entry.n = (entry.n || 0) + 1;
+      entry.e = text(m.e, 200) || entry.e || '';
+      entry.x = text(m.x, 80);
+      entry.s = text(m.s, 200);
+      entry.a = Math.max(0, Math.min(entry.s.length, m.a | 0));
+      entry.b = Math.max(entry.a, Math.min(entry.s.length, m.b | 0));
+      entry.t = text(m.t, 100);
+      entry.u = /^https?:/.test(text(m.u, 300)) ? text(m.u, 300) : '';
+      entry.at = now;
+      list.unshift(entry);
+      if (list.length > LOOKED) list.length = LOOKED;
+      return api.storage.local.set({ looked: list, lookedHead: { n: list.length, recent: list.slice(0, 5) } }).then(function () { return { ok: true, n: list.length }; });
+    });
+  });
+  keeping = done.catch(function () {});
+  return done;
+}
 
 function badge(settings) {
   var action = api.action || api.browserAction;

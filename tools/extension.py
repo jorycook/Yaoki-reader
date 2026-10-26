@@ -37,7 +37,7 @@ GECKO_ID = 'yaoki-reader@jorycook.github.io'
 
 # the engine's files: worker.js loads the scripts beside it, and they load the dictionary from beside them
 ENGINE_FILES = ['worker.js', 'kuromoji.js', 'analyzer.js', 'boot.js', 'jm-1.txt', 'jm-2.txt', 'jm-3.txt', 'kanji.txt']
-COMMON = ['background.js', 'host.js', 'content.js', 'content.css', 'popup.html', 'popup.js', 'icons']
+COMMON = ['background.js', 'host.js', 'content.js', 'content.css', 'popup.html', 'popup.js', 'list.html', 'list.js', 'icons']
 CHROME_ONLY = ['host.html', 'host-offscreen.js']
 
 

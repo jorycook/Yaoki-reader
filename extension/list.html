@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Looked up · Yaoki Reader</title>
+<style>
+/* The list of words looked up on web pages (のぞいた語句), in the reader's look. Everything here is on this device. */
+:root {
+  --ground: #F4F5F9; --card: #FFFFFF; --ink: #1B2440; --muted: #5A6382;
+  --line: #DDE1EC; --line-strong: #C9D0E3; --outline: #1B2440; --hard: #1B2440;
+  --accent: #2F4FD0; --accent-ink: #2F4FD0; --accent-soft: #E8ECFB; --on-accent: #FFFFFF;
+  --mark: #FFE9B0; --note: #FFF4D6; --stamp: #C7361E;
+  --ui: 'Hiragino Maru Gothic ProN', 'M PLUS Rounded 1c', 'Yu Gothic', 'Meiryo', system-ui, sans-serif;
+  --jp: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', 'Noto Serif CJK JP', serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #12172A; --card: #1C233B; --ink: #E8EBF6; --muted: #A6AECA;
+    --line: #2C3554; --line-strong: #3B466C; --outline: #7B86B4; --hard: #05070F;
+    --accent: #4560E0; --accent-ink: #A9B8FF; --accent-soft: #262F58; --on-accent: #FFFFFF;
+    --mark: #5E4B10; --note: #37301A; --stamp: #FF8D76;
+    color-scheme: dark;
+  }
+}
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font-family: var(--ui); font-size: 15px; line-height: 1.45; font-weight: 500; -webkit-text-size-adjust: 100%; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
+main { max-width: 640px; margin: 0 auto; padding: 16px 16px 60px; display: flex; flex-direction: column; gap: 12px; }
+.top { display: flex; align-items: center; gap: 10px; }
+.top img { width: 36px; height: 36px; border-radius: 10px; border: 2px solid var(--outline); }
+h1 { flex: 1; min-width: 0; margin: 0; font-size: 20px; font-weight: 800; }
+h1 small { display: block; font-size: 13px; font-weight: 700; color: var(--muted); }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tools input { flex: 1 1 180px; min-width: 0; box-sizing: border-box; min-height: 40px; padding: 6px 12px; border-radius: 12px; border: 2px solid var(--outline); background: var(--card); font-size: 15px; }
+.mini { min-height: 40px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--outline); background: var(--card); font-size: 13px; font-weight: 800; }
+.mini.danger { background: var(--stamp); border-color: var(--stamp); color: var(--ground); }
+.hint { font-size: 13px; font-weight: 700; color: var(--muted); }
+#list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+#list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 2px; border-bottom: 2px solid var(--line); }
+#list .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+#list .w { font-family: var(--jp); font-size: 20px; font-weight: 600; }
+#list .r { font-size: 12px; font-weight: 700; color: var(--muted); }
+#list .n { font-size: 11px; font-weight: 800; color: var(--accent-ink); padding: 1px 7px; border-radius: 9px; background: var(--accent-soft); }
+#list .g { grid-column: 1; font-size: 13px; }
+#list .s { grid-column: 1; font-family: var(--jp); font-size: 15px; line-height: 1.7; color: var(--ink); }
+#list .s b { font-weight: 600; background: var(--mark); border-radius: 3px; padding: 0 1px; }
+#list .src { grid-column: 1; font-size: 12px; font-weight: 700; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 10px; }
+#list .src a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#list .x { grid-column: 2; grid-row: 1 / span 4; align-self: start; width: 36px; height: 36px; padding: 0; border-radius: 10px; border: 2px solid var(--line-strong); background: var(--card); font-size: 16px; font-weight: 800; color: var(--muted); }
+.empty { padding: 12px 14px; border-radius: 14px; border: 2px dashed var(--line-strong); font-size: 13px; font-weight: 700; color: var(--muted); }
+.confirm { padding: 12px 14px; border-radius: 18px; border: 2px dashed var(--stamp); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-weight: 700; }
+.confirm span { flex: 1 1 160px; }
+.notebox { padding: 10px 12px; border-radius: 16px; background: var(--note); font-size: 12px; line-height: 1.5; }
+.notebox b { font-weight: 800; }
+#toast { position: fixed; z-index: 2; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 14px; background: var(--ink); color: var(--ground); font-size: 13px; font-weight: 700; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <img src="icons/icon-48.png" alt="">
+    <h1><span lang="ja">のぞいた語句</span> <small>Looked up with Yaoki Reader, newest first. Kept on this device only.</small></h1>
+  </div>
+  <div class="tools">
+    <input type="search" id="filter" lang="ja" placeholder="Find a word, reading, meaning or sentence" aria-label="Find">
+    <button class="mini" type="button" id="anki">Save for Anki</button>
+    <button class="mini" type="button" id="copy">Copy the sentences</button>
+    <button class="mini" type="button" id="clear">Clear the list</button>
+  </div>
+  <div class="confirm" id="confirm" hidden><span>Clear every word from the list? This cannot be undone.</span><button class="mini danger" type="button" id="clear-yes">Clear</button><button class="mini" type="button" id="clear-no">Keep</button></div>
+  <p class="hint" id="count"></p>
+  <ul id="list"></ul>
+  <div class="empty" id="empty" hidden>Nothing yet. Touch a word on a Japanese page and hold it, and it is listed here with its sentence.</div>
+  <div class="notebox"><b>Save for Anki</b> writes a text file (tab-separated: word, reading, meaning, sentence, source) that Anki's Import takes as it is, one note per word. <b>Copy the sentences</b> puts them on the clipboard, to paste into the Yaoki Reader app as a text to read. The list is only in this browser: uninstalling the extension deletes it, so save it first.</div>
+</main>
+<div id="toast" hidden></div>
+<script src="list.js"></script>
+</body>
+</html>
