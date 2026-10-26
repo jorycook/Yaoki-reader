@@ -3,15 +3,15 @@
 (function () {
 'use strict';
 var api = typeof browser !== 'undefined' && browser.runtime ? browser : chrome;
-var DEFAULTS = { on: true, off: [], furigana: true, meanings: true, grammar: true, hold: 1, keep: true };
+var DEFAULTS = { on: true, off: [], furigana: true, meanings: true, grammar: true, more: true, hold: 1, keep: true, size: 1 };
 var S = Object.assign({}, DEFAULTS), site = '';
 function $(id) { return document.getElementById(id); }
 
 function save() { return api.storage.local.set({ settings: S }); }
 function render() {
   $('sw-on').setAttribute('aria-checked', String(S.on));
-  ['furigana', 'meanings', 'grammar', 'keep'].forEach(function (k) { $('sw-' + k).setAttribute('aria-checked', String(S[k])); });
-  [0, 1, 2].forEach(function (i) { $('hold-' + i).setAttribute('aria-pressed', String(S.hold === i)); });
+  ['furigana', 'meanings', 'grammar', 'more', 'keep'].forEach(function (k) { $('sw-' + k).setAttribute('aria-checked', String(S[k])); });
+  [0, 1, 2].forEach(function (i) { $('hold-' + i).setAttribute('aria-pressed', String(S.hold === i)); $('size-' + i).setAttribute('aria-pressed', String(S.size === i)); });
   var b = $('sw-site');
   if (site) {
     b.disabled = !S.on;
@@ -26,9 +26,10 @@ api.storage.local.get('settings').then(function (v) {
 });
 
 $('sw-on').addEventListener('click', function () { S.on = !S.on; render(); save(); });
-['furigana', 'meanings', 'grammar', 'keep'].forEach(function (k) {
+['furigana', 'meanings', 'grammar', 'more', 'keep'].forEach(function (k) {
   $('sw-' + k).addEventListener('click', function () { S[k] = !S[k]; render(); save(); });
 });
+[0, 1, 2].forEach(function (i) { $('size-' + i).addEventListener('click', function () { S.size = i; render(); save(); }); });
 
 /* the list of words looked up: how many, the newest few, and the page that shows them all */
 function showLooked(head) {

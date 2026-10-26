@@ -21,6 +21,12 @@
   "background": {
     "service_worker": "background.js"
   },
+  "commands": {
+    "toggle": {
+      "suggested_key": { "default": "Alt+Shift+Y" },
+      "description": "Switch Yaoki Reader on or off"
+    }
+  },
   "permissions": ["storage", "offscreen"],
   "content_scripts": [
     {

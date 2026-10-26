@@ -409,7 +409,13 @@ Dict.prototype.pick = function (key, cls, reading, inflected, weak) {
   });
   var en = shortGloss(best.sense.g), better = kanaKey && (GLOSS[key + ':' + cls] || GLOSS[key + ':' + (best.e.k[0] || '')] || GLOSS[key]);
   if (better) en = better;
-  return { en: en, reading: rd, matched: matched, readings: best.e.r, old: best.e.old, rank: best.e.rank, k: best.e.k };
+  /* the word's other senses (at most two more; a hand-written gloss already draws the usual senses together) */
+  var more = [];
+  if (!better) best.e.senses.forEach(function (s) {
+    var g = s !== best.sense && shortGloss(s.g);
+    if (g && g !== en && more.indexOf(g) < 0 && more.length < 2) more.push(g);
+  });
+  return { en: en, reading: rd, matched: matched, readings: best.e.r, old: best.e.old, rank: best.e.rank, k: best.e.k, more: more };
 };
 
 /* ---------- numbers ---------- */
@@ -1535,7 +1541,7 @@ Engine.prototype.paragraph = function (text, spans, names, oldStyle) {
         return ng ? { s: segs, e: ng } : { s: segs, f: 1 };
       }
       var head = w.toks[w.preLen || 0] || w.toks[0];
-      var en = '', rd = '', headword = '';
+      var en = '', rd = '', headword = '', more = null;
       var isNumber = /^[0-9０-９.,，．]+$/.test(head.surface_form);
       if (!isNumber) {
         var stemReading = '';
@@ -1644,13 +1650,15 @@ Engine.prototype.paragraph = function (text, spans, names, oldStyle) {
             hit = { en: hit.en, reading: hit.baseReading || '' };
           }
         }
-        if (hit) { en = hit.en; rd = hit.reading; headword = hit.k && hit.k[0] || ''; }
+        if (hit) { en = hit.en; rd = hit.reading; headword = hit.k && hit.k[0] || ''; if (self.more && hit.more && hit.more.length) more = hit.more; }
         else en = unknownGloss(ownSurface, ownReading, head, isName);
       }
       var o = { s: segs };
       /* for checking the engine (tools, tests): which dictionary word was taken */
       if (root.YOMU_DEBUG) { o.k = headword || w.key; o.key = w.key; }
       if (en) o.e = en;
+      /* the word's other senses, only when asked for (the browser extension): the reader's analyses stay as they were */
+      if (more) o.m = more;
       if (!isNumber) {
         var cand = [w.key, hasKanji(w.key) ? rd : '', en];
         if (!first) { first = cand; firstWeak = w.cls === 'x' || w.cls === 'd'; }
@@ -1672,9 +1680,11 @@ Engine.prototype.paragraph = function (text, spans, names, oldStyle) {
   return out;
 };
 
-/* ruby: the text's own furigana, [start, length, reading] in text (as Aozora Bunko gives it); may be left out */
-Engine.prototype.analyze = function (text, ruby) {
+/* ruby: the text's own furigana, [start, length, reading] in text (as Aozora Bunko gives it); may be left out.
+   opts.more: give each word's other senses too (m), which the reader does not ask for */
+Engine.prototype.analyze = function (text, ruby, opts) {
   var self = this, src = String(text).replace(/\r\n?/g, '\n');
+  this.more = !!(opts && opts.more);
   var spans = (Array.isArray(ruby) ? ruby : []).filter(function (r) {
     return Array.isArray(r) && r[0] >= 0 && r[1] > 0 && r[0] + r[1] <= src.length && typeof r[2] === 'string' && /^[ぁ-ゖァ-ヺー]+$/.test(r[2]);
   }).sort(function (a, b) { return a[0] - b[0]; });

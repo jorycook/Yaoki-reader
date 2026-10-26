@@ -23,6 +23,7 @@ const PAGES = {
 <p id="weather">今日はいい天気ですね！明日、一緒に行きませんか？</p>
 <p id="link"><a href="${SITE}next.html">新しい記事を読む</a></p>
 <p id="kakawa">彼はその事件に関わった。</p>
+<p id="raise">銀行が金利を引き上げる。</p>
 <p id="english">This line is English and nothing happens when it is held.</p>
 <div id="editor" contenteditable="true">ここに感想を書いてください。</div>
 <p id="ruby">その<ruby><rb>犍陀多</rb><rp>（</rp><rt>かんだた</rt><rp>）</rp></ruby>と云う男は、<ruby>蜘蛛<rt>くも</rt></ruby>を助けた。</p>
@@ -63,6 +64,8 @@ ${'<p>駅の前に小さな本屋があって、私は毎朝そこで新聞を�
 <body style="margin:0;padding:8px 16px;font:17px/1.8 sans-serif">
 ${'<p>小さな町の図書館では、毎週土曜日に子ども向けの読み聞かせ会が開かれている。参加した親子は静かに話を聞いていた。</p>'.repeat(40)}
 </body></html>`,
+  'dark.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><title>dark</title>
+<body style="margin:0;padding:300px 30px;font:20px/1.8 serif;background:#14161a;color:#e8e8e8"><p id="d">夜の町は静かだった。</p></body></html>`,
   'desktop.html': `<!doctype html><html lang="ja"><meta charset="utf-8"><title>desktop</title>
 <body style="margin:0;padding:200px 30px;width:960px;font:16px/1.7 sans-serif"><p id="d">駅前の喫茶店で友達と待ち合わせをした。</p></body></html>`,
 };
@@ -112,6 +115,10 @@ async function main() {
           markTop: (this.querySelector('.mark') || { getBoundingClientRect: () => ({ top: -1 }) }).getBoundingClientRect().top,
           kept: (() => { let u = null; this.querySelectorAll('.mark, .rd').forEach((e) => { const r = e.getBoundingClientRect(); if (!r.width) return; u = u ? { left: Math.min(u.left, r.left), top: Math.min(u.top, r.top), right: Math.max(u.right, r.right), bottom: Math.max(u.bottom, r.bottom) } : { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; }); return u; })(),
           forms: Array.from(card.querySelectorAll('.lb')).filter((e) => getComputedStyle(e).display !== 'none').map((e) => e.textContent),
+          others: Array.from(card.querySelectorAll('.lm')).filter((e) => getComputedStyle(e).display !== 'none').map((e) => e.textContent),
+          lj: card.querySelector('.lj') ? parseFloat(getComputedStyle(card.querySelector('.lj')).fontSize) : 0,
+          rdSize: this.querySelector('.rd') ? parseFloat(getComputedStyle(this.querySelector('.rd')).fontSize) : 0,
+          cardBg: getComputedStyle(card).backgroundColor,
           inTopLayer: this.host.matches(':popover-open'),
           fills: this.querySelectorAll('.mark.fill').length,
         };
@@ -212,6 +219,43 @@ async function main() {
   L = await until(async () => { const l = await layer(); return l.shown && /天気/.test(l.card) && l; }, 5000);
   ok(L && L.forms.length === 0, 'holding 天気 shows none');
   await lift();
+
+  const ON = { on: true, off: [], furigana: true, meanings: true, grammar: true, more: true, hold: 1, keep: true, size: 1 };
+  step('other meanings, text size, a dark page, Esc and the shortcut');
+  p = await at('#raise', '引');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /引き上げる/.test(l.card) && l; }, 5000);
+  ok(L && L.others.length === 1 && /ほかの意味/.test(L.others[0]) && /to increase/.test(L.others[0]), 'holding 引き上げる shows its other senses under the card: ' + JSON.stringify(L && L.others));
+  const lj1 = L && L.lj, rd1 = L && L.rdSize;
+  ok(L && L.cardBg === 'rgb(255, 255, 255)', 'on a light page the card is light (' + (L && L.cardBg) + ')');
+  await lift();
+  await sw.evaluate((on) => chrome.storage.local.set({ settings: Object.assign({}, on, { more: false, size: 2 }) }), ON);
+  await wait(200);
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /引き上げる/.test(l.card) && l; }, 5000);
+  ok(L && L.others.length === 0, 'with Other meanings off, the line is gone');
+  ok(L && L.lj > lj1 * 1.1 && L.rdSize > rd1 * 1.1, 'with the large text size, the card and the readings are larger (' + lj1 + ' → ' + (L && L.lj) + ', ' + rd1 + ' → ' + (L && L.rdSize) + ')');
+  await lift();
+  await sw.evaluate((on) => chrome.storage.local.set({ settings: on }), ON);
+  await wait(200);
+  await page.goto(SITE + 'dark.html');
+  p = await at('#d', '静');
+  await hold(p);
+  L = await until(async () => { const l = await layer(); return l.shown && /静か/.test(l.card) && l; }, 5000);
+  ok(L && L.cardBg === 'rgb(28, 35, 59)', 'on a dark page the card is dark (' + (L && L.cardBg) + ')');
+  await lift();
+  await page.goto(SITE + 'plain.html');
+  p = await at('#weather', '今');
+  await page.mouse.move(p.x, p.y);
+  await page.keyboard.down('Shift');
+  L = await until(async () => { const l = await layer(); return l.shown && /今日/.test(l.card) && l; }, 5000);
+  await page.keyboard.press('Escape');
+  await wait(200);
+  ok(L && !(await layer()).shown, 'Esc puts the card away while Shift is still held');
+  await page.keyboard.up('Shift');
+  const flipped = await sw.evaluate(() => toggleOn().then((on) => chrome.storage.local.get('settings').then((v) => [on, v.settings.on])));
+  ok(flipped[0] === false && flipped[1] === false, 'the shortcut\'s command switches it off');
+  ok((await sw.evaluate(() => toggleOn())) === true, 'and on again');
 
   step('the card keeps clear of the finger, upright and sideways');
   await page.goto(SITE + 'place.html');
@@ -491,7 +535,6 @@ async function main() {
   await lift();
 
   step('the list of words looked up');
-  const ON = { on: true, off: [], furigana: true, meanings: true, grammar: true, hold: 1, keep: true };
   await sw.evaluate((on) => chrome.storage.local.set({ settings: on, looked: [], lookedHead: { n: 0, recent: [] } }), ON);
   const looked = () => sw.evaluate(() => chrome.storage.local.get('looked').then((v) => v.looked || []));
   await page.goto(SITE + 'plain.html');

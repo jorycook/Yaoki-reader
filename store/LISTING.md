@@ -16,9 +16,9 @@ Touch a Japanese word on any page and hold it to see its reading over the kanji 
 
 Read Japanese on the web the way you would with a teacher beside you: touch a word and keep your finger on it. Its reading appears over the kanji in the page, the phrase is marked, and a card shows what each word means and any grammar pattern in it (〜ながら, 〜ません and the like). Slide your finger to the next word; lift it and everything hides again. A swipe still scrolls and a tap still follows a link.
 
-With a mouse, hold the button down on a word, or hold Shift and point.
+With a mouse, hold the button down on a word, or hold Shift and point; Esc puts the card away, and a keyboard shortcut (Alt+Shift+Y at first) switches it on and off.
 
-What a touch shows is up to you: furigana, word meanings, the grammar note, each with its own switch; the dictionary form of an inflected word (行く for 行きません) comes with the meaning. The words you look up go on a list (のぞいた語句, as in the app) with the sentence each was in, to look over later or save for Anki; a switch turns the list off, and it never leaves your device. A page's own furigana decide readings where the page has them. Chinese pages are left alone.
+What a touch shows is up to you: furigana, word meanings, the grammar note, the word's other senses, each with its own switch, and the text size; the dictionary form of an inflected word (行く for 行きません) comes with the meaning. On a dark page the card is dark too. The words you look up go on a list (のぞいた語句, as in the app) with the sentence each was in, to look over later or save for Anki; a switch turns the list off, and it never leaves your device. A page's own furigana decide readings where the page has them. Chinese pages are left alone.
 
 Everything is worked out on your device, from a dictionary carried inside the extension (JMdict for words, KANJIDIC2 for kanji, kuromoji.js for splitting sentences into words). Nothing you read is sent anywhere, and the extension makes no network requests at all. Switch it off for a site, or everywhere, from its toolbar panel.
 

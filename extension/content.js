@@ -11,7 +11,9 @@ if (window.__yaokiReader) return;
 window.__yaokiReader = true;
 
 /* ---------- settings (kept by popup.js in storage.local) ---------- */
-var DEFAULTS = { on: true, off: [], furigana: true, meanings: true, grammar: true, hold: 1, keep: true };
+var DEFAULTS = { on: true, off: [], furigana: true, meanings: true, grammar: true, more: true, hold: 1, keep: true, size: 1 };
+/* the card's and the readings' size: small, normal, large */
+var SIZES = [0.86, 1, 1.18];
 /* how long a finger or the mouse button stays still on a word before it counts as holding it, in ms */
 var HOLDS = [120, 220, 400];
 var S = Object.assign({}, DEFAULTS);
@@ -465,9 +467,10 @@ var STYLE = [
   '  --accent: #2F4FD0; --accent-ink: #2F4FD0; --accent-soft: #E8ECFB; --mark: #FFE9B0; --note: #FFF4D6; --stamp: #C7361E;',
   "  --ui: 'Hiragino Maru Gothic ProN', 'M PLUS Rounded 1c', 'Yu Gothic', 'Meiryo', system-ui, sans-serif;",
   "  --jp: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', 'Noto Serif CJK JP', 'Source Han Serif JP', serif; }",
-  '@media (prefers-color-scheme: dark) { .box { --card: #1C233B; --ink: #E8EBF6; --muted: #A6AECA; --line: #2C3554; --line-strong: #3B466C;',
-  '  --outline: #7B86B4; --hard: #05070F; --accent: #4560E0; --accent-ink: #A9B8FF; --accent-soft: #262F58; --mark: #5E4B10; --note: #37301A; --stamp: #FF8D76; } }',
-  '.box { position: fixed; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }',
+  '.box.dark { --card: #1C233B; --ink: #E8EBF6; --muted: #A6AECA; --line: #2C3554; --line-strong: #3B466C;',
+  '  --outline: #7B86B4; --hard: #05070F; --accent: #4560E0; --accent-ink: #A9B8FF; --accent-soft: #262F58; --mark: #5E4B10; --note: #37301A; --stamp: #FF8D76; }',
+  '.box { position: fixed; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; direction: ltr; unicode-bidi: isolate; --f: 1; }',
+  '.box.s0 { --f: 0.86; } .box.s2 { --f: 1.18; }',
   '.mark { position: fixed; box-sizing: border-box; border-radius: 4px 4px 0 0; border-bottom: 2px solid #1B2440; }',
   '.mark.fill { background: rgba(255, 223, 128, 0.3); }',
   '.rd { position: fixed; left: 0; top: 0; box-sizing: border-box; white-space: nowrap; padding: 1px 3px; border-radius: 4px; background: var(--card); color: var(--ink);',
@@ -475,33 +478,36 @@ var STYLE = [
   '.rd.v { writing-mode: vertical-rl; padding: 3px 1px; }',
   '.card { position: fixed; left: 0; top: 0; box-sizing: border-box; width: max-content; padding: 8px 14px 12px; border-radius: 18px; background: var(--card); color: var(--ink);',
   '  border: 2px solid var(--outline); box-shadow: 0 4px 0 var(--hard); display: flex; flex-direction: column; gap: 8px; transform-origin: 0 0;',
-  '  font-family: var(--ui); font-size: 15px; line-height: 1.45; font-weight: 500; text-align: left; white-space: normal; letter-spacing: 0; }',
+  '  font-family: var(--ui); font-size: calc(15px * var(--f)); line-height: 1.45; font-weight: 500; text-align: left; white-space: normal; letter-spacing: 0; }',
   '.card[hidden], .rd[hidden] { display: none; }',
   '.lw { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 14px; padding-top: 4px; }',
   '.lc { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }',
-  '.lj { font-family: var(--jp); font-size: 26px; font-weight: 500; line-height: 46px; white-space: nowrap; }',
+  '.lj { font-family: var(--jp); font-size: calc(26px * var(--f)); font-weight: 500; line-height: calc(46px * var(--f)); white-space: nowrap; }',
   '.lc.f .lj { color: var(--muted); }',
   '.rb { position: relative; }',
-  '.rt { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); white-space: nowrap; font-family: var(--jp); font-size: 11px; font-weight: 400;',
-  '  line-height: 1; margin-bottom: -3px; color: var(--muted); }',
+  '.rt { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); white-space: nowrap; font-family: var(--jp); font-size: calc(11px * var(--f)); font-weight: 400;',
+  '  line-height: 1; margin-bottom: calc(-3px * var(--f)); color: var(--muted); }',
   '.no-furi .rt { visibility: hidden; }',
-  '.le { min-height: 15px; max-width: 180px; font-size: 12px; font-weight: 700; line-height: 15px; text-align: center; text-wrap: balance; }',
+  '.le { min-height: calc(15px * var(--f)); max-width: calc(180px * var(--f)); font-size: calc(12px * var(--f)); font-weight: 700; line-height: calc(15px * var(--f)); text-align: center; text-wrap: balance; }',
   '.no-mean .le { display: none; }',
   '.lb { display: flex; align-items: baseline; gap: 4px; margin-top: 3px; white-space: nowrap; }',
-  '.lb b { font-size: 10px; font-weight: 800; color: var(--accent-ink); }',
-  '.lb span { font-family: var(--jp); font-size: 15px; font-weight: 600; }',
-  '.lb i { font-style: normal; font-size: 11px; font-weight: 700; color: var(--muted); }',
+  '.lb b { font-size: calc(10px * var(--f)); font-weight: 800; color: var(--accent-ink); }',
+  '.lb span { font-family: var(--jp); font-size: calc(15px * var(--f)); font-weight: 600; }',
+  '.lb i { font-style: normal; font-size: calc(11px * var(--f)); font-weight: 700; color: var(--muted); }',
+  '.lm { display: flex; align-items: baseline; gap: 8px; max-width: calc(360px * var(--f)); font-size: calc(12px * var(--f)); font-weight: 700; line-height: 1.35; color: var(--muted); }',
+  '.lm b { flex-shrink: 0; font-size: calc(10px * var(--f)); font-weight: 800; color: var(--accent-ink); }',
+  '.no-mean .lm { display: none; }',
   '.no-mean .lb { display: none; }',
   '.no-furi .lb i { display: none; }',
-  '.lg { display: flex; align-items: baseline; gap: 8px; padding: 5px 10px; border-radius: 10px; background: var(--accent-soft); line-height: 22px; }',
-  '.lg b { flex-shrink: 0; font-size: 11px; font-weight: 800; color: var(--accent-ink); }',
-  '.lg span { flex-shrink: 0; font-family: var(--jp); font-size: 15px; font-weight: 600; }',
-  '.lg em { font-style: normal; font-size: 12px; font-weight: 700; line-height: 16px; }',
-  '.wait { display: flex; flex-direction: column; gap: 8px; max-width: 300px; font-size: 13px; font-weight: 700; }',
-  '.wait .ja { font-family: var(--jp); font-size: 16px; font-weight: 600; }',
+  '.lg { display: flex; align-items: baseline; gap: 8px; padding: 5px 10px; border-radius: 10px; background: var(--accent-soft); line-height: calc(22px * var(--f)); }',
+  '.lg b { flex-shrink: 0; font-size: calc(11px * var(--f)); font-weight: 800; color: var(--accent-ink); }',
+  '.lg span { flex-shrink: 0; font-family: var(--jp); font-size: calc(15px * var(--f)); font-weight: 600; }',
+  '.lg em { font-style: normal; font-size: calc(12px * var(--f)); font-weight: 700; line-height: calc(16px * var(--f)); }',
+  '.wait { display: flex; flex-direction: column; gap: 8px; max-width: 300px; font-size: calc(13px * var(--f)); font-weight: 700; }',
+  '.wait .ja { font-family: var(--jp); font-size: calc(16px * var(--f)); font-weight: 600; }',
   '.track { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }',
   '.track i { display: block; height: 100%; border-radius: 0 5px 5px 0; background: var(--accent); }',
-  '.problem { max-width: 300px; font-size: 13px; font-weight: 700; color: var(--stamp); }',
+  '.problem { max-width: 300px; font-size: calc(13px * var(--f)); font-weight: 700; color: var(--stamp); }',
 ].join('\n');
 
 function el(tag, cls, text) {
@@ -577,6 +583,15 @@ function fillCard(c) {
     row.appendChild(col);
   });
   card.appendChild(row);
+  /* the main word's other senses (the engine gives each word its own; the main word is the one with the phrase's
+     meaning, or else the first that has any) */
+  var main = c.w.filter(function (w) { return w.m && w.m.length && (!c.d || w.e === c.d[2]); })[0] || c.w.filter(function (w) { return w.m && w.m.length; })[0];
+  if (S.more && main) {
+    var lm = el('div', 'lm');
+    var mt = el('b', null, 'ほかの意味'); mt.lang = 'ja';
+    lm.appendChild(mt); lm.appendChild(el('span', null, main.m.join(' · ')));
+    card.appendChild(lm);
+  }
   if (S.grammar) (c.g || []).forEach(function (g) {
     var line = el('div', 'lg');
     var tag = el('b', null, '文法'); tag.lang = 'ja';
@@ -633,6 +648,24 @@ function view() {
   return { left: vv.offsetLeft, top: vv.offsetTop, width: vv.width, height: vv.height, k: Math.max(0.2, Math.min(5, k)) };
 }
 /* Puts the card by what it is about (the phrase and the readings over it, which it never covers). */
+/* The card and the readings take the page's own lightness where the phrase is (a dark page gets the dark card),
+   and the size chosen. */
+function dress(spot) {
+  var box = layer.box, dark = pageIsDark(spot && spot.el);
+  box.className = 'box' + (dark ? ' dark' : '') + (S.size === 0 ? ' s0' : S.size === 2 ? ' s2' : '');
+}
+/* whether the background behind an element is dark: the first ancestor painted with a colour decides; a page
+   that paints none follows the browser's light or dark setting */
+function pageIsDark(el) {
+  for (var e = el; e && e.nodeType === 1; e = e.parentElement || (e.getRootNode && e.getRootNode().host)) {
+    var m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*[,/]\s*([\d.]+%?))?/.exec(getComputedStyle(e).backgroundColor || '');
+    if (!m) continue;
+    var a = m[4] === undefined ? 1 : parseFloat(m[4]) / (/%$/.test(m[4]) ? 100 : 1);
+    if (a < 0.5) continue;
+    return (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255 < 0.45;
+  }
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
 function placeCard(keep, touchy) {
   var card = layer.card, v = view();
   card.style.visibility = 'hidden'; card.hidden = false;
@@ -760,7 +793,7 @@ function markPhrase(spot, ph) {
   });
   if (S.furigana) {
     var px = parseFloat(getComputedStyle(elementOf(range.startContainer)).fontSize) || 16;
-    var size = Math.max(9 * view().k, Math.min(px * 0.55, 22));
+    var size = Math.max(9 * view().k, Math.min(px * 0.55, 22)) * (SIZES[S.size] || 1);
     var labels = [];
     ph.segs.forEach(function (s) {
       if (!s.reading) return;
@@ -830,11 +863,11 @@ function lookAt(x, y, touchy, found) {
       redraw();
     } else if (res.wait) {
       shown = { key: '', spot: spot, ph: null, at: -1, touchy: touchy };
-      clearMarks(); waitCard(res.wait); lift(); placeCard(boxOfSpot(spot), touchy);
+      clearMarks(); dress(spot); waitCard(res.wait); lift(); placeCard(boxOfSpot(spot), touchy);
       retry = setTimeout(function () { if (n === asked && holdingAny() && lastPoint) { asked++; lookAt(lastPoint.x, lastPoint.y, lastTouchy); } }, 300);
     } else {
       shown = { key: '', spot: spot, ph: null, at: -1, touchy: touchy };
-      clearMarks(); problemCard(res.error || 'unknown error'); lift(); placeCard(boxOfSpot(spot), touchy);
+      clearMarks(); dress(spot); problemCard(res.error || 'unknown error'); lift(); placeCard(boxOfSpot(spot), touchy);
     }
   });
   return true;
@@ -847,6 +880,7 @@ function boxOfSpot(spot) {
 function redraw() {
   if (!shown || !shown.ph) return;
   lift();
+  dress(shown.spot);
   var m = markPhrase(shown.spot, shown.ph);
   fillCard(shown.ph.c);
   placeCard(m.box, shown.touchy);
@@ -1094,6 +1128,14 @@ window.addEventListener('keydown', function (e) {
 }, true);
 window.addEventListener('keyup', function (e) {
   if (e.key === 'Shift' && holding === 'shift') { holding = ''; shiftShown = false; release(); }
+}, true);
+/* Esc puts the card away, whatever holds it (the button stays down until it is let go; Shift until it is) */
+window.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape' || (!shown && !holding)) return;
+  clearTimeout(holdTimer); clearTimeout(mouseTimer);
+  if (holding === 'touch') unquietHere();
+  holding = ''; shiftShown = false; mouse = null; touch = null;
+  release();
 }, true);
 window.addEventListener('blur', function () {
   clearTimeout(holdTimer); clearTimeout(mouseTimer);

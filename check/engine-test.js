@@ -100,6 +100,15 @@ g.YomuBoot('', null).then((engine) => {
   ok(/already/.test(find(ws, 'もう').e) && /only/.test(find(ws, 'ただ').e) && /as if/.test(find(ws, 'まるで').e), 'common kana words get their usual senses (もう, ただ, まるで)');
   ok(/now/.test(find(ws, 'いま').e) && /^I, me/.test(find(ws, 'わし').e), 'and the usual word (いま 今, わし 儂)');
 
+  console.log('-- other senses, only when asked for (the browser extension)');
+  const plain = engine.analyze('銀行が金利を引き上げる。もう帰る。');
+  const withMore = engine.analyze('銀行が金利を引き上げる。もう帰る。', null, { more: true });
+  ok(!JSON.stringify(plain).includes('"m":'), 'without the option, no word has other senses (the reader\'s analyses are as before)');
+  const raise = withMore.paras[0].flatMap((c) => c.w || []).find((w) => w.e && /pull up/.test(w.e));
+  ok(raise && raise.m && raise.m.length === 2 && /to increase/.test(raise.m[0]), '引き上げる has two other senses, the first "to increase": ' + JSON.stringify(raise && raise.m));
+  const mou = withMore.paras[0].flatMap((c) => c.w || []).find((w) => w.s[0][0] === 'もう');
+  ok(mou && !mou.m, 'もう, whose gloss already draws its senses together, has none');
+
   console.log('-- readings fixed before');
   ws = words(engine, '令和元年の八日に、一本の傘を電車に忘れた。');
   ok(['令和', '八日', '一本'].every((k) => find(ws, k).e), 'the earlier fixes still hold (令和, 八日, 一本)');

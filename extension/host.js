@@ -58,7 +58,8 @@ function analyze(text, ruby) {
   return new Promise(function (resolve) {
     var id = nextId++;
     waiting.set(id, function (m) { resolve(m.type === 'result' ? { analysis: m.analysis } : { error: m.message }); });
-    worker.postMessage({ type: 'analyze', id: id, text: text, ruby: ruby });
+    /* more: each word's other senses as well, for the card's ほかの意味 line */
+    worker.postMessage({ type: 'analyze', id: id, text: text, ruby: ruby, opts: { more: true } });
   });
 }
 

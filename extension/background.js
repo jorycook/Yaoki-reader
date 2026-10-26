@@ -103,6 +103,17 @@ function keepWord(m) {
   return done;
 }
 
+/* the keyboard shortcut (the manifest's command) switches it on or off everywhere */
+var DEFAULTS = { on: true, off: [], furigana: true, meanings: true, grammar: true, more: true, hold: 1, keep: true, size: 1 };
+function toggleOn() {
+  return api.storage.local.get('settings').then(function (v) {
+    var s = Object.assign({}, DEFAULTS, v && v.settings);
+    s.on = !s.on;
+    return api.storage.local.set({ settings: s }).then(function () { return s.on; });
+  });
+}
+if (api.commands && api.commands.onCommand) api.commands.onCommand.addListener(function (name) { if (name === 'toggle') toggleOn(); });
+
 function badge(settings) {
   var action = api.action || api.browserAction;
   if (!action || !action.setBadgeText) return;
