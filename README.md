@@ -76,6 +76,7 @@ The site is `docs/`, served by GitHub Pages (Settings → Pages → Deploy from 
 | `extension/background.js`, `host.js`, `host.html`, `host-offscreen.js` | Pass lookups to the one engine for all tabs (`docs/engine/worker.js`) and keep it running: in Chrome's offscreen document (`host.html`), or in the background page in Firefox and Safari. |
 | `extension/popup.html`, `popup.js`, `manifest.json`, `icons/` | The toolbar panel (settings kept in the browser's extension storage), the manifest the three builds are made from, and the icons (drawn by `tools/icons.mjs`). |
 | `extension/list.html`, `list.js` | The list of words looked up (`looked` in the extension storage, written by `background.js`): find, delete, copy the sentences, save for Anki. |
+| `extension/welcome.html` | Opened once, when the extension is installed: the gesture, and lines to try it on. |
 | `tools/` | `aozora-catalog.py` (remakes the catalog), `jm-supplement.py`, `kanji-meanings.py`, `jisx0213-table.py`, `icons.mjs`, `extension.py` (builds the extension into `dist/`), `jm-index.js` (the extension's word index made ahead of time). |
 | `check/` | The tests (Playwright; Selenium for the extension in Firefox). |
 

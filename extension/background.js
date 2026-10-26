@@ -103,6 +103,12 @@ function keepWord(m) {
   return done;
 }
 
+/* once, when it is installed: a page that says what the gesture is, with lines to try it on (on a phone there is
+   no toolbar to find that out from) */
+api.runtime.onInstalled.addListener(function (d) {
+  if (d && d.reason === 'install') api.tabs.create({ url: api.runtime.getURL('welcome.html') });
+});
+
 /* the keyboard shortcut (the manifest's command) switches it on or off everywhere */
 var DEFAULTS = { on: true, off: [], furigana: true, meanings: true, grammar: true, more: true, hold: 1, keep: true, size: 1 };
 function toggleOn() {

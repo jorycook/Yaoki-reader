@@ -156,6 +156,15 @@ async function main() {
     return v;
   }
 
+  step('installed, it opens its welcome page once');
+  const welcome = await until(async () => ctx.pages().find((pg) => /\/welcome\.html$/.test(pg.url())), 5000);
+  ok(!!welcome, 'a page with the gesture and lines to try it on opens on install');
+  if (welcome) {
+    await welcome.waitForSelector('.try p');
+    ok(/Try it on these lines/.test(await welcome.locator('main').innerText()) && (await welcome.locator('.try p').count()) >= 3, 'it says how, and gives lines to try');
+    await welcome.close();
+  }
+
   step('switched off, a Japanese page loads nothing');
   const contexts = () => sw.evaluate(() => chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] }).then((c) => c.length));
   await sw.evaluate(() => chrome.storage.local.set({ settings: { on: false, off: [], furigana: true, meanings: true, grammar: true, hold: 1 } }));

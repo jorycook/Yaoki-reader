@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yaoki Reader is on · try it here</title>
+<style>
+/* Opened once, when the extension is installed: what the gesture is, and a few lines to try it on. The reader's
+   stationery. Everything here is on this device. */
+:root {
+  --ground: #F4F5F9; --card: #FFFFFF; --ink: #1B2440; --muted: #5A6382;
+  --line: #DDE1EC; --line-strong: #C9D0E3; --outline: #1B2440; --hard: #1B2440;
+  --accent: #2F4FD0; --accent-ink: #2F4FD0; --accent-soft: #E8ECFB; --note: #FFF4D6;
+  --ui: 'Hiragino Maru Gothic ProN', 'M PLUS Rounded 1c', 'Yu Gothic', 'Meiryo', system-ui, sans-serif;
+  --jp: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', 'Noto Serif CJK JP', serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #12172A; --card: #1C233B; --ink: #E8EBF6; --muted: #A6AECA;
+    --line: #2C3554; --line-strong: #3B466C; --outline: #7B86B4; --hard: #05070F;
+    --accent: #4560E0; --accent-ink: #A9B8FF; --accent-soft: #262F58; --note: #37301A;
+    color-scheme: dark;
+  }
+}
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font-family: var(--ui); font-size: 15px; line-height: 1.5; font-weight: 500; -webkit-text-size-adjust: 100%; }
+main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; display: flex; flex-direction: column; gap: 14px; }
+.top { display: flex; align-items: center; gap: 12px; }
+.top img { width: 44px; height: 44px; border-radius: 12px; border: 2px solid var(--outline); }
+h1 { flex: 1; min-width: 0; margin: 0; font-size: 22px; font-weight: 800; }
+h1 small { display: block; font-size: 13px; font-weight: 700; color: var(--muted); }
+.how { padding: 12px 14px; border-radius: 18px; background: var(--card); border: 2px solid var(--outline); box-shadow: 0 3px 0 var(--hard); display: flex; flex-direction: column; gap: 8px; }
+.how p { margin: 0; }
+.how b { font-weight: 800; }
+.try { padding: 16px 18px 18px; border-radius: 18px; background: var(--card); border: 2px solid var(--line-strong); }
+.try h2 { margin: 0 0 8px; font-size: 13px; font-weight: 800; color: var(--muted); }
+.try p { margin: 0 0 0.6em; font-family: var(--jp); font-size: 20px; line-height: 2.1; font-weight: 500; }
+.note { padding: 10px 14px; border-radius: 16px; background: var(--note); font-size: 13px; line-height: 1.5; }
+.note b { font-weight: 800; }
+.foot { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.foot a { display: inline-flex; align-items: center; min-height: 36px; color: var(--accent-ink); font-size: 13px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <img src="icons/icon-48.png" alt="">
+    <h1>Yaoki Reader is on <small>Readings and meanings at a touch, on any Japanese page</small></h1>
+  </div>
+
+  <div class="how">
+    <p><b>On a phone or tablet:</b> touch a Japanese word and keep your finger on it. Its reading appears over the kanji, and a card shows what each word means. Slide your finger to the next word; lift it and everything hides. A swipe still scrolls, a tap still follows a link.</p>
+    <p><b>With a mouse:</b> hold the button down on a word, still, for a moment, or hold <b>Shift</b> and point. <b>Esc</b> puts the card away.</p>
+  </div>
+
+  <div class="try" lang="ja">
+    <h2 lang="en">Try it on these lines</h2>
+    <p>今日はいい天気ですね。公園まで歩きませんか。</p>
+    <p>駅前の古い本屋が、来月で店を閉じることになった。</p>
+    <p>雨が降っていたので、傘を持って図書館まで歩いた。</p>
+    <p>知らない言葉があっても、指で触れれば読み方と意味がわかる。</p>
+  </div>
+
+  <div class="note"><b>Nothing you read leaves this device.</b> The dictionary is inside the extension, and it makes no network requests. The words you look up go on a list you can open from the toolbar button (and switch off there); on a phone, the toolbar button is in the browser's extensions menu. The first lookup after a while takes a few seconds while the dictionary loads.</div>
+
+  <div class="foot">
+    <a href="https://jorycook.github.io/Yaoki-reader/" target="_blank" rel="noopener">The Yaoki Reader app</a>
+    <a href="https://jorycook.github.io/Yaoki-reader/privacy.html" target="_blank" rel="noopener">Privacy statement</a>
+    <a href="licenses.txt" target="_blank" rel="noopener">Dictionary credits and licences</a>
+  </div>
+</main>
+</body>
+</html>
